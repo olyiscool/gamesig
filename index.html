@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollie's Games - Play Online</title>
+    <!-- Tailwind CSS for modern utility styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS for direct WebRTC connection -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Chess.js for complete move validation, checkmate detection, and state tracking -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: radial-gradient(circle at top left, #01251b, #020617);
+        }
+        /* Custom scrollbar for chat */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #047857;
+            border-radius: 9999px;
+        }
+        /* 3D Patterned Connect 4 Red Tokens */
+        .c4-token-red {
+            background: radial-gradient(circle, #fca5a5 10%, #ef4444 30%, #b91c1c 70%, #7f1d1d 100%);
+            box-shadow: inset 0 4px 6px rgba(255,255,255,0.6), 0 6px 14px rgba(239, 68, 68, 0.5);
+            border: 4px double #f87171;
+            position: relative;
+        }
+        .c4-token-red::after {
+            content: '';
+            position: absolute;
+            top: 25%;
+            left: 25%;
+            width: 50%;
+            height: 50%;
+            border-radius: 50%;
+            border: 2px dashed rgba(255, 255, 255, 0.4);
+        }
+        /* 3D Patterned Connect 4 Yellow Tokens */
+        .c4-token-yellow {
+            background: radial-gradient(circle, #fef08a 10%, #eab308 30%, #a16207 70%, #713f12 100%);
+            box-shadow: inset 0 4px 6px rgba(255,255,255,0.6), 0 6px 14px rgba(234, 179, 8, 0.5);
+            border: 4px double #facc15;
+            position: relative;
+        }
+        .c4-token-yellow::after {
+            content: '';
+            position: absolute;
+            top: 25%;
+            left: 25%;
+            width: 50%;
+            height: 50%;
+            border-radius: 50%;
+            border: 2px dashed rgba(255, 255, 255, 0.4);
+        }
+        .c4-cell-empty {
+            box-shadow: inset 0 6px 10px rgba(0,0,0,0.9);
+            background-color: #020617;
+        }
+        /* Neon glows */
+        .neon-shadow-red {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+        }
+        .neon-shadow-yellow {
+            box-shadow: 0 0 20px rgba(234, 179, 8, 0.6);
+        }
+        .neon-shadow-emerald {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+        /* Active difficulty card selector */
+        .difficulty-card.active {
+            border-color: #10b981;
+            background-color: rgba(16, 185, 129, 0.1);
+            transform: scale(1.05);
+        }
+        /* Chess Board Styles */
+        .chess-square-light {
+            background-color: #e2e8f0;
+            color: #1e293b;
+        }
+        .chess-square-dark {
+            background-color: #0f766e;
+            color: #f1f5f9;
+        }
+        .chess-square-selected {
+            background-color: #a7f3d0 !important;
+            box-shadow: inset 0 0 10px #10b981;
+        }
+        .chess-square-highlight {
+            position: relative;
+        }
+        .chess-square-highlight::before {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: rgba(16, 185, 129, 0.5);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            pointer-events: none;
+        }
+        .chess-piece {
+            font-size: 2.75rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            transition: transform 0.15s ease-out;
+            z-index: 20;
+        }
+        .chess-piece:hover {
+            transform: scale(1.08);
+        }
+        @media (max-width: 640px) {
+            .chess-piece {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-emerald-100 flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-emerald-900/60 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <!-- Glowing Yellow Smiley Face Logo -->
+                <div class="w-11 h-11 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center shadow-lg shadow-yellow-500/20">
+                    <svg class="w-8 h-8 text-yellow-400" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 4c.83 0 1.5.67 1.5 1.5S13.83 9 13 9s-1.5-.67-1.5-1.5S12.17 6 13 6zm-5 3c-.83 0-1.5-.67-1.5-1.5S7.17 6 8 6s1.5.67 1.5 1.5S8.83 9 8 9zm4 9c-2.33 0-4.31-1.46-5.11-3.5h10.22c-.8 2.04-2.78 3.5-5.11 3.5z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-white via-emerald-300 to-emerald-400">OLLIE'S GAMES</h1>
+                    <p class="text-[10px] uppercase tracking-widest text-emerald-500 font-semibold">P2P Arcade Station</p>
+                </div>
+            </div>
+            
+            <!-- User Handle and ELO display -->
+            <div class="flex flex-col sm:flex-row items-center gap-3">
+                <div class="bg-slate-950/80 px-4 py-1.5 rounded-xl border border-emerald-900/40 text-xs flex gap-2 items-center">
+                    <span class="text-emerald-500 font-bold uppercase tracking-wider">Your Chess Rating:</span>
+                    <span id="player-elo-badge" class="font-black text-white text-sm">1200 ELO</span>
+                </div>
+                <div class="flex items-center gap-3 bg-slate-950/60 p-1.5 rounded-xl border border-emerald-900/40">
+                    <span class="text-xs text-emerald-400 pl-3 font-bold">Your Handle:</span>
+                    <input type="text" id="username" value="Player" onchange="updateUsername()" class="bg-emerald-950/80 border border-emerald-800/80 rounded-lg px-3 py-1 text-sm font-semibold text-white focus:outline-none focus:border-emerald-500 w-32 sm:w-40 transition-all">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col lg:flex-row gap-6">
+        
+        <!-- Left Column: Primary Game / Dashboard View -->
+        <div class="flex-grow flex flex-col bg-emerald-950/10 rounded-3xl border border-emerald-900/40 p-6 min-h-[500px]">
+            
+            <!-- VIEW 1: Main Landing Dashboard (Replicating user sketch) -->
+            <div id="view-landing" class="flex-grow flex flex-col justify-center py-4 space-y-8">
+                
+                <!-- Lobby Header & Profile Info -->
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4 px-4 bg-slate-950/40 p-4 rounded-2xl border border-emerald-900/20">
+                    <div class="text-left">
+                        <span class="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400 uppercase tracking-widest">Profile Identity</span>
+                        <h2 class="text-xl font-bold mt-2 text-white">Welcome back to Ollie's Games!</h2>
+                    </div>
+                    <!-- Your Friend Code Card -->
+                    <div class="bg-slate-900/80 p-3.5 rounded-xl border border-emerald-500/30 flex flex-col items-center min-w-[200px] shadow-lg shadow-emerald-500/5">
+                        <span class="text-[9px] font-black tracking-widest text-emerald-500 uppercase">Your Friend Code</span>
+                        <code id="my-id" class="text-lg font-black text-white tracking-widest mt-0.5">Generating...</code>
+                        <button onclick="copyRoomID()" class="text-[10px] text-emerald-400 font-bold mt-1.5 hover:text-emerald-300">Copy Code</button>
+                    </div>
+                </div>
+
+                <!-- Games Panel -->
+                <div class="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto w-full px-4">
+                    <!-- Connect 4 Card -->
+                    <div class="flex flex-col justify-between items-center bg-slate-950/60 border border-emerald-900/30 rounded-2xl p-5 shadow-xl transition-all hover:border-emerald-500/40">
+                        <div class="w-full text-center">
+                            <h3 class="text-xl font-bold mb-3 tracking-wide text-white">Connect 4</h3>
+                            <!-- Preview Box -->
+                            <div class="w-full h-36 bg-slate-950 rounded-xl border border-emerald-900/40 flex items-center justify-center p-3 relative overflow-hidden">
+                                <div class="grid grid-cols-7 gap-1.5 bg-emerald-950/40 p-2 rounded-lg border border-emerald-850/60">
+                                    <div class="w-4 h-4 rounded-full c4-token-red"></div>
+                                    <div class="w-4 h-4 rounded-full bg-slate-900"></div>
+                                    <div class="w-4 h-4 rounded-full c4-token-yellow"></div>
+                                    <div class="w-4 h-4 rounded-full bg-slate-900"></div>
+                                    <div class="w-4 h-4 rounded-full c4-token-red"></div>
+                                    <div class="w-4 h-4 rounded-full bg-slate-900"></div>
+                                    <div class="w-4 h-4 rounded-full bg-slate-900"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="clickPlayGame('c4')" class="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg tracking-wider py-3 rounded-xl transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg uppercase">
+                            Play
+                        </button>
+                    </div>
+
+                    <!-- Chess Card (NEW) -->
+                    <div class="flex flex-col justify-between items-center bg-slate-950/60 border border-emerald-900/30 rounded-2xl p-5 shadow-xl transition-all hover:border-emerald-500/40">
+                        <div class="w-full text-center">
+                            <h3 class="text-xl font-bold mb-3 tracking-wide text-white">Chess</h3>
+                            <!-- Preview Box -->
+                            <div class="w-full h-36 bg-slate-950 rounded-xl border border-emerald-900/40 flex items-center justify-center p-3 relative overflow-hidden">
+                                <div class="grid grid-cols-4 gap-1 p-1 bg-teal-850 border border-emerald-900/30 rounded-lg">
+                                    <div class="w-7 h-7 bg-emerald-100 flex items-center justify-center text-slate-900 text-lg"><img src="https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg" class="w-full h-full object-contain"></div>
+                                    <div class="w-7 h-7 bg-teal-800 flex items-center justify-center text-slate-100 text-lg"></div>
+                                    <div class="w-7 h-7 bg-emerald-100 flex items-center justify-center text-slate-900 text-lg"></div>
+                                    <div class="w-7 h-7 bg-teal-800 flex items-center justify-center text-slate-100 text-lg"><img src="https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg" class="w-full h-full object-contain"></div>
+                                    <div class="w-7 h-7 bg-teal-800 flex items-center justify-center text-slate-900 text-lg"></div>
+                                    <div class="w-7 h-7 bg-emerald-100 flex items-center justify-center text-slate-100 text-lg"><img src="https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg" class="w-full h-full object-contain"></div>
+                                    <div class="w-7 h-7 bg-teal-800 flex items-center justify-center text-slate-900 text-lg"><img src="https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg" class="w-full h-full object-contain"></div>
+                                    <div class="w-7 h-7 bg-emerald-100 flex items-center justify-center text-slate-100 text-lg"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="clickPlayGame('chess')" class="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg tracking-wider py-3 rounded-xl transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg uppercase">
+                            Play
+                        </button>
+                    </div>
+
+                    <!-- Tic-Tac-Toe Card -->
+                    <div class="flex flex-col justify-between items-center bg-slate-950/60 border border-emerald-900/30 rounded-2xl p-5 shadow-xl transition-all hover:border-emerald-500/40">
+                        <div class="w-full text-center">
+                            <h3 class="text-xl font-bold mb-3 tracking-wide text-white">Tic-Tac-Toe</h3>
+                            <!-- Preview Box -->
+                            <div class="w-full h-36 bg-slate-950 rounded-xl border border-emerald-900/40 flex items-center justify-center p-3 relative overflow-hidden">
+                                <div class="grid grid-cols-3 gap-1 bg-slate-900/60 p-2 rounded-lg border border-emerald-900/30 w-24">
+                                    <div class="w-5 h-5 flex items-center justify-center font-black text-red-500 text-xs">X</div>
+                                    <div class="w-5 h-5 flex items-center justify-center font-black text-yellow-500 text-xs">O</div>
+                                    <div class="w-5 h-5"></div>
+                                    <div class="w-5 h-5"></div>
+                                    <div class="w-5 h-5 flex items-center justify-center font-black text-red-500 text-xs">X</div>
+                                    <div class="w-5 h-5"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="clickPlayGame('ttt')" class="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-lg tracking-wider py-3 rounded-xl transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg uppercase">
+                            Play
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Friends Directory Panel shifted directly onto the Main Home Page -->
+                <div class="max-w-4xl mx-auto w-full px-4 pt-6 border-t border-emerald-900/30">
+                    <div class="bg-slate-950/50 border border-emerald-900/30 rounded-2xl p-5 flex flex-col md:flex-row gap-6">
+                        
+                        <!-- Friends List -->
+                        <div class="flex-grow space-y-3">
+                            <div class="flex items-center justify-between border-b border-emerald-900/20 pb-2">
+                                <span class="text-xs font-semibold text-emerald-400 tracking-wider uppercase">Saved Friends Quick Connect</span>
+                                <span class="text-[9px] text-emerald-700 font-bold">Lobby Browser Cache</span>
+                            </div>
+                            <div id="friends-list-container" class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                                <!-- Populated dynamically -->
+                                <p class="text-xs text-emerald-700/70 italic py-4 text-center">No saved friends yet.</p>
+                            </div>
+                        </div>
+
+                        <!-- Register a Friend Form -->
+                        <div class="w-full md:w-[320px] bg-slate-900/40 border border-emerald-950 p-4 rounded-xl space-y-3 shrink-0">
+                            <p class="text-xs font-bold text-emerald-400 uppercase tracking-wide">Register a Friend</p>
+                            <div class="space-y-2">
+                                <input type="text" id="friend-name" placeholder="Friend Name (eg. Nick)" class="w-full bg-slate-950 border border-emerald-900/40 rounded-lg px-3 py-2 text-xs text-white placeholder-emerald-800 focus:outline-none focus:border-emerald-500">
+                                <input type="text" id="friend-id" placeholder="Friend Code (eg. OL-7F2A)" class="w-full bg-slate-950 border border-emerald-900/40 rounded-lg px-3 py-2 text-xs text-white placeholder-emerald-800 focus:outline-none focus:border-emerald-500">
+                                <button onclick="saveFriend()" class="w-full bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 rounded-lg transition-all active:scale-95">Add Friend</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: Lobby Connection & Difficulty Selector (Inside Game Choice) -->
+            <div id="view-lobby" class="hidden flex-grow flex flex-col justify-center py-4 space-y-6">
+                <div class="flex items-center justify-between px-4">
+                    <button onclick="backToLanding()" class="text-xs font-bold text-emerald-400 hover:text-white flex items-center gap-1">&larr; Back to Games</button>
+                    <span id="selected-game-badge" class="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400 uppercase tracking-wider">Connect 4 Mode</span>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-6 px-4">
+                    <!-- Left: Singleplayer AI Bot Panel -->
+                    <div class="bg-slate-950/60 border border-emerald-900/40 p-6 rounded-2xl flex flex-col justify-between space-y-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                                🤖 Solo vs Bot
+                            </h3>
+                            <p class="text-xs text-emerald-600 mb-4">Practice your moves against our automated artificial intelligence system.</p>
+                            
+                            <!-- Bot Difficulties with Emojis -->
+                            <div class="grid grid-cols-3 gap-3">
+                                <!-- Easy -->
+                                <button onclick="selectBotDifficulty('easy')" id="diff-easy" class="difficulty-card active border border-emerald-900/60 bg-slate-900/40 p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all">
+                                    <span class="text-2xl">😊</span>
+                                    <span class="text-xs font-extrabold text-emerald-400">Easy</span>
+                                    <span class="text-[9px] text-emerald-600">800 ELO</span>
+                                </button>
+                                <!-- Medium -->
+                                <button onclick="selectBotDifficulty('medium')" id="diff-medium" class="difficulty-card border border-emerald-900/60 bg-slate-900/40 p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all">
+                                    <span class="text-2xl">😐</span>
+                                    <span class="text-xs font-extrabold text-yellow-400">Medium</span>
+                                    <span class="text-[9px] text-emerald-600">1200 ELO</span>
+                                </button>
+                                <!-- Hard -->
+                                <button onclick="selectBotDifficulty('hard')" id="diff-hard" class="difficulty-card border border-emerald-900/60 bg-slate-900/40 p-3 rounded-xl flex flex-col items-center gap-1.5 transition-all">
+                                    <span class="text-2xl">😈</span>
+                                    <span class="text-xs font-extrabold text-red-400">Hard</span>
+                                    <span class="text-[9px] text-emerald-600">1600 ELO</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <button onclick="startBotMatch()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg active:scale-95 text-sm uppercase tracking-wider">
+                            Start Bot Game
+                        </button>
+                    </div>
+
+                    <!-- Right: Connect to Friend's Room Panel -->
+                    <div class="bg-slate-950/60 border border-emerald-900/40 p-6 rounded-2xl flex flex-col justify-between space-y-6">
+                        <div>
+                            <h3 class="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                                👥 Connect to Friend
+                            </h3>
+                            <p class="text-xs text-emerald-600 mb-4">Paste your friend's unique Friend Code to establish a live connection.</p>
+                            
+                            <!-- Connect via Friend Code Box -->
+                            <div class="bg-slate-900/40 p-4 rounded-xl border border-emerald-950 space-y-3">
+                                <label class="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Enter Friend Code</label>
+                                <input type="text" id="join-id" placeholder="Paste OL-XXXXX code here..." class="w-full bg-slate-950 border border-emerald-900/60 rounded-lg px-3 py-2 text-sm text-white placeholder-emerald-800 focus:outline-none focus:border-emerald-500 uppercase tracking-wider">
+                            </div>
+                        </div>
+
+                        <button onclick="joinRoom()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg active:scale-95 text-sm uppercase tracking-wider">
+                            Join Friend
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 3: Connect 4 Play Arena -->
+            <div id="view-c4" class="hidden flex-grow flex flex-col items-center justify-center">
+                <div class="flex items-center justify-between w-full max-w-md mb-6">
+                    <button onclick="quitToLobby()" class="text-xs font-bold text-emerald-400 hover:text-white flex items-center gap-1">&larr; Return to Hub</button>
+                    <div id="c4-turn-status" class="text-sm font-extrabold px-3 py-1.5 rounded-full bg-slate-900 border border-emerald-800">Waiting...</div>
+                    <button onclick="resetGame('c4')" class="text-xs font-bold text-emerald-400 hover:text-emerald-300">Restart</button>
+                </div>
+                
+                <!-- Connect 4 Column Actions -->
+                <div class="grid grid-cols-7 gap-2 sm:gap-3 w-full max-w-[450px] px-2 mb-2">
+                    <button onclick="dropC4(0)" class="h-8 rounded-lg bg-emerald-950 hover:bg-emerald-600/30 text-xs font-bold transition-all text-emerald-300">&darr;</button>
+                    <button onclick="dropC4(1)" class="h-8 rounded-lg bg-emerald-950 hover:bg-emerald-600/30 text-xs font-bold transition-all text-emerald-300">&darr;</button>
+                    <button onclick="dropC4(2)" class="h-8 rounded-lg bg-emerald-950 hover:bg-emerald-600/30 text-xs font-bold transition-all text-emerald-300">&darr;</button>
+                    <button onclick="dropC4(3)" class="h-8 rounded-lg bg-emerald-950 hover:bg-emerald-600/30 text-xs font-bold transition-all text-emerald-300">&darr;</button>
+                    <button onclick="dropC4(4)" class="h-8 rounded-lg bg-emerald-950 hover:bg-emerald-600/30 text-xs font-bold transition-all text-emerald-300">&darr;</button>
+                    <button onclick="dropC4(5)" class="h-8 rounded-lg bg-emerald-950 hover:bg-emerald-600/30 text-xs font-bold transition-all text-emerald-300">&darr;</button>
+                    <button onclick="dropC4(6)" class="h-8 rounded-lg bg-emerald-950 hover:bg-emerald-600/30 text-xs font-bold transition-all text-emerald-300">&darr;</button>
+                </div>
+
+                <!-- Connect 4 Grid -->
+                <div class="bg-emerald-900 p-3 sm:p-4 rounded-2xl shadow-2xl shadow-emerald-950/50 border-4 border-emerald-950 w-full max-w-[450px]">
+                    <div id="c4-grid" class="grid grid-cols-7 gap-2 sm:gap-3">
+                        <!-- Filled Dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 4: Tic-Tac-Toe Play Arena -->
+            <div id="view-ttt" class="hidden flex-grow flex flex-col items-center justify-center">
+                <div class="flex items-center justify-between w-full max-w-sm mb-6">
+                    <button onclick="quitToLobby()" class="text-xs font-bold text-emerald-400 hover:text-white flex items-center gap-1">&larr; Return to Hub</button>
+                    <div id="ttt-turn-status" class="text-sm font-extrabold px-3 py-1.5 rounded-full bg-slate-900 border border-emerald-800">Waiting...</div>
+                    <button onclick="resetGame('ttt')" class="text-xs font-bold text-emerald-400 hover:text-emerald-300">Restart</button>
+                </div>
+
+                <!-- Tic-Tac-Toe Grid -->
+                <div class="grid grid-cols-3 gap-3 w-full max-w-[320px] bg-slate-950 p-3 rounded-2xl border border-emerald-850 shadow-2xl">
+                    <button onclick="playTTT(0)" id="ttt-0" class="h-24 w-full bg-slate-900 border border-emerald-950 hover:bg-emerald-900/20 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(1)" id="ttt-1" class="h-24 w-full bg-slate-900 border border-emerald-950 hover:bg-emerald-900/20 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(2)" id="ttt-2" class="h-24 w-full bg-slate-900 border border-emerald-950 hover:bg-emerald-900/20 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(3)" id="ttt-3" class="h-24 w-full bg-slate-900 border border-emerald-950 hover:bg-emerald-900/20 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(4)" id="ttt-4" class="h-24 w-full bg-slate-900 border border-emerald-950 hover:bg-emerald-900/20 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(5)" id="ttt-5" class="h-24 w-full bg-slate-900 border border-emerald-950 hover:bg-emerald-900/20 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(6)" id="ttt-6" class="h-24 w-full bg-slate-900 border border-emerald-950 hover:bg-emerald-900/20 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(7)" id="ttt-7" class="h-24 w-full bg-slate-900 border border-emerald-950 hover:bg-emerald-900/20 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(8)" id="ttt-8" class="h-24 w-full bg-slate-900 border border-emerald-950 hover:bg-emerald-900/20 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                </div>
+            </div>
+
+            <!-- VIEW 5: Chess Play Arena (NEW) -->
+            <div id="view-chess" class="hidden flex-grow flex flex-col items-center justify-center relative">
+                <!-- Promotion Choice Overlay Modal -->
+                <div id="chess-promotion-modal" class="hidden absolute inset-0 bg-slate-950/90 z-50 flex flex-col items-center justify-center space-y-4 rounded-3xl p-6">
+                    <p class="text-xl font-extrabold text-white">Promote Pawn</p>
+                    <p class="text-xs text-emerald-400">Choose a piece to upgrade your pawn to.</p>
+                    <div class="flex gap-4">
+                        <button id="promo-q" onclick="selectPromotion('q')" class="bg-slate-900 border border-emerald-800 hover:border-emerald-400 p-3 rounded-xl shadow-lg transition-transform hover:scale-105 flex items-center justify-center"></button>
+                        <button id="promo-r" onclick="selectPromotion('r')" class="bg-slate-900 border border-emerald-800 hover:border-emerald-400 p-3 rounded-xl shadow-lg transition-transform hover:scale-105 flex items-center justify-center"></button>
+                        <button id="promo-b" onclick="selectPromotion('b')" class="bg-slate-900 border border-emerald-800 hover:border-emerald-400 p-3 rounded-xl shadow-lg transition-transform hover:scale-105 flex items-center justify-center"></button>
+                        <button id="promo-n" onclick="selectPromotion('n')" class="bg-slate-900 border border-emerald-800 hover:border-emerald-400 p-3 rounded-xl shadow-lg transition-transform hover:scale-105 flex items-center justify-center"></button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between w-full max-w-lg mb-4">
+                    <button onclick="quitToLobby()" class="text-xs font-bold text-emerald-400 hover:text-white flex items-center gap-1">&larr; Return to Hub</button>
+                    <div id="chess-turn-status" class="text-sm font-extrabold px-3 py-1.5 rounded-full bg-slate-900 border border-emerald-800">White's Turn</div>
+                    <button onclick="resetGame('chess')" class="text-xs font-bold text-emerald-400 hover:text-emerald-300">Restart</button>
+                </div>
+
+                <!-- Opponent Captured Shelf -->
+                <div class="flex items-center gap-1 bg-slate-950/40 px-3 py-1.5 rounded-xl border border-emerald-950 w-full max-w-md mb-2">
+                    <span class="text-[10px] text-emerald-700 uppercase font-black tracking-widest mr-2">Captured:</span>
+                    <div id="chess-captured-by-black" class="flex items-center gap-1 text-xl leading-none"></div>
+                </div>
+
+                <!-- 8x8 Chessboard Container -->
+                <div class="bg-slate-950 p-2 sm:p-3 rounded-2xl shadow-2xl border-4 border-slate-900 w-full max-w-md aspect-square select-none">
+                    <div id="chess-grid" class="grid grid-cols-8 grid-rows-8 gap-0 h-full w-full">
+                        <!-- Chess squares populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Player Captured Shelf -->
+                <div class="flex items-center gap-1 bg-slate-950/40 px-3 py-1.5 rounded-xl border border-emerald-950 w-full max-w-md mt-2 mb-4">
+                    <span class="text-[10px] text-emerald-700 uppercase font-black tracking-widest mr-2">Captured:</span>
+                    <div id="chess-captured-by-white" class="flex items-center gap-1 text-xl leading-none text-white"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Sidebar Live Chat & Activity -->
+        <div class="w-full lg:w-[380px] shrink-0 flex flex-col bg-slate-950/60 rounded-3xl border border-emerald-900/40 overflow-hidden shadow-xl">
+            <!-- Sidebar Header -->
+            <div class="px-5 py-4 border-b border-emerald-900/30 bg-slate-950/40 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-sm font-bold tracking-wide text-white">Live Lobby Chat</span>
+                </div>
+                <span id="opponent-badge" class="text-xs bg-slate-900 text-emerald-500 border border-emerald-950 px-2.5 py-1 rounded-md font-semibold">Singleplayer</span>
+            </div>
+
+            <!-- Messages Window -->
+            <div id="chat-messages" class="flex-grow p-4 space-y-3 h-[300px] lg:h-[450px] overflow-y-auto custom-scrollbar bg-slate-950/20">
+                <div class="text-xs text-emerald-600/70 text-center py-2 italic border-b border-emerald-950/40">Welcome to Ollie's Games! Share your Friend Code to play online.</div>
+            </div>
+
+            <!-- Messages Input -->
+            <div class="p-3 border-t border-emerald-900/30 bg-slate-950/50 flex gap-2">
+                <input type="text" id="chat-input" placeholder="Type a message..." class="flex-grow bg-slate-900 border border-emerald-950 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all" onkeypress="if(event.key === 'Enter') sendChat()">
+                <button onclick="sendChat()" class="bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl px-4 py-2 text-sm font-bold transition-all active:scale-95">Send</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Game and network state management
+        let myUsername = "Player";
+        let opponentUsername = "Opponent";
+        let targetGameMode = null; 
+        let activeGame = null; // 'c4', 'ttt', 'chess'
+        let peer = null;
+        let conn = null;
+        let myPlayerNum = 0; // 1 = Host, 2 = Guest (Player vs AI: Player is 1, AI is 2)
+        let currentPlayerTurn = 1; 
+        let isConnected = false;
+        let isBotGame = false;
+        let selectedDifficulty = 'easy';
+        let myFriendCode = "OL-XXXXX";
+        let playerElo = 1200;
+
+        // Connect 4 Data
+        const C4_ROWS = 6;
+        const C4_COLS = 7;
+        let c4Board = [];
+        let c4Active = false;
+
+        // Tic Tac Toe Data
+        let tttBoard = Array(9).fill("");
+        let tttActive = false;
+
+        // Chess Engine Instance & Selection Data
+        let chessInstance = null;
+        let selectedChessSquare = null;
+        let legalMovesForSelection = [];
+        let chessPromotionPendingMove = null;
+
+        // Friends List Array
+        let friends = [];
+
+        // UI View Swapper
+        function switchView(viewId) {
+            document.getElementById('view-landing').classList.add('hidden');
+            document.getElementById('view-lobby').classList.add('hidden');
+            document.getElementById('view-c4').classList.add('hidden');
+            document.getElementById('view-ttt').classList.add('hidden');
+            document.getElementById('view-chess').classList.add('hidden');
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        // Action when user clicks main landing "PLAY" buttons
+        function clickPlayGame(gameKey) {
+            targetGameMode = gameKey;
+            
+            if (isConnected) {
+                isBotGame = false;
+                selectGame(gameKey);
+            } else {
+                // Set game context badge in lobby
+                const badge = document.getElementById('selected-game-badge');
+                if (gameKey === 'c4') {
+                    badge.innerText = "Connect 4 Setup";
+                    badge.className = "px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-xs font-semibold text-red-400 uppercase tracking-wider";
+                } else if (gameKey === 'chess') {
+                    badge.innerText = "Chess Setup";
+                    badge.className = "px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-xs font-semibold text-teal-400 uppercase tracking-wider";
+                } else {
+                    badge.innerText = "Tic-Tac-Toe Setup";
+                    badge.className = "px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-xs font-semibold text-yellow-400 uppercase tracking-wider";
+                }
+                switchView('view-lobby');
+            }
+        }
+
+        function backToLanding() {
+            targetGameMode = null;
+            switchView('view-landing');
+        }
+
+        function updateUsername() {
+            const input = document.getElementById('username');
+            myUsername = input.value.trim() || "Player";
+            if(conn && conn.open) {
+                conn.send({ type: 'sync_name', username: myUsername });
+            }
+        }
+
+        // Difficulty Settings
+        function selectBotDifficulty(diff) {
+            selectedDifficulty = diff;
+            document.getElementById('diff-easy').classList.remove('active');
+            document.getElementById('diff-medium').classList.remove('active');
+            document.getElementById('diff-hard').classList.remove('active');
+            
+            document.getElementById(`diff-${diff}`).classList.add('active');
+        }
+
+        function startBotMatch() {
+            isBotGame = true;
+            myPlayerNum = 1; // Player is always White (Player 1)
+            let botEmoji = selectedDifficulty === 'easy' ? '😊' : selectedDifficulty === 'medium' ? '😐' : '😈';
+            let botElo = selectedDifficulty === 'easy' ? 800 : selectedDifficulty === 'medium' ? 1200 : 1600;
+            opponentUsername = `AI Bot ${botEmoji} (${botElo})`;
+            
+            document.getElementById('opponent-badge').innerText = opponentUsername;
+            document.getElementById('opponent-badge').className = "text-xs bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-md font-semibold";
+            
+            addSystemMsg(`Started Solo Match vs Bot (${selectedDifficulty.toUpperCase()})`);
+            
+            initGameEngine(targetGameMode, true);
+        }
+
+        // Auto-generate Friend Code formatted as OL-XXXXX (5 alphanumeric characters)
+        function generateFriendCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Readable subset
+            let token = '';
+            for (let i = 0; i < 5; i++) {
+                token += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return `OL-${token}`;
+        }
+
+        // --- Elo Rating Calculations ---
+        function loadEloRating() {
+            let savedElo = localStorage.getItem('ollie_games_elo');
+            if(savedElo) {
+                playerElo = parseInt(savedElo);
+            } else {
+                playerElo = 1200;
+                localStorage.setItem('ollie_games_elo', 1200);
+            }
+            document.getElementById('player-elo-badge').innerText = `${playerElo} ELO`;
+        }
+
+        function calculateEloChange(result) {
+            // result: 1 = Win, 0.5 = Tie, 0 = Loss
+            let oppElo = 1200; // default standard for connected player
+            if (isBotGame) {
+                oppElo = selectedDifficulty === 'easy' ? 800 : selectedDifficulty === 'medium' ? 1200 : 1600;
+            }
+
+            const K = 32;
+            const expectedScore = 1 / (1 + Math.pow(10, (oppElo - playerElo) / 400));
+            const change = Math.round(K * (result - expectedScore));
+            
+            playerElo = Math.max(100, playerElo + change);
+            localStorage.setItem('ollie_games_elo', playerElo);
+            document.getElementById('player-elo-badge').innerText = `${playerElo} ELO`;
+            
+            addSystemMsg(`Rating updated: ${change >= 0 ? '+' : ''}${change} ELO (New Rating: ${playerElo})`);
+        }
+
+        // --- P2P Connections ---
+        function initPeer() {
+            loadEloRating();
+            myFriendCode = generateFriendCode();
+            
+            // Connect to PeerJS server directly using our clean custom Friend Code
+            peer = new Peer(myFriendCode);
+
+            peer.on('open', (id) => {
+                document.getElementById('my-id').innerText = id;
+            });
+
+            // When a friend connects to our Friend Code
+            peer.on('connection', (connection) => {
+                conn = connection;
+                myPlayerNum = 1; // Host is Player 1
+                isBotGame = false;
+                handleConnection();
+            });
+
+            // Load saved friends list
+            loadFriends();
+        }
+
+        function joinRoom(directId = null) {
+            let targetId = directId || document.getElementById('join-id').value.trim();
+            if(!targetId) {
+                alert("Please enter a Friend Code first!");
+                return;
+            }
+            
+            targetId = targetId.toUpperCase();
+            
+            addSystemMsg(`Dialing Friend Code: ${targetId}...`);
+            conn = peer.connect(targetId);
+            myPlayerNum = 2; // Guest is Player 2
+            isBotGame = false;
+            handleConnection();
+        }
+
+        function handleConnection() {
+            conn.on('open', () => {
+                isConnected = true;
+                isBotGame = false;
+                document.getElementById('opponent-badge').innerText = "Connected";
+                document.getElementById('opponent-badge').classList.remove('bg-slate-900', 'text-emerald-500');
+                document.getElementById('opponent-badge').classList.add('bg-emerald-500/10', 'text-emerald-400');
+                
+                // Instantly share names
+                conn.send({ type: 'sync_name', username: myUsername });
+                addSystemMsg("Lobby connected! Ready to play.");
+
+                // If host and has already selected a game mode, launch it immediately
+                if (myPlayerNum === 1 && targetGameMode) {
+                    selectGame(targetGameMode);
+                } else if (myPlayerNum === 1) {
+                    addSystemMsg("Choose a game from the lobby cards to launch!");
+                }
+            });
+
+            conn.on('data', (data) => {
+                if(data.type === 'sync_name') {
+                    opponentUsername = data.username;
+                    addSystemMsg(`${opponentUsername} linked to lobby!`);
+                } 
+                else if(data.type === 'chat') {
+                    addChatMessage(opponentUsername, data.message, false);
+                } 
+                else if(data.type === 'game_select') {
+                    activeGame = data.game;
+                    initGameEngine(activeGame, false);
+                }
+                else if(data.type === 'c4_move') {
+                    processC4Move(data.col, false);
+                }
+                else if(data.type === 'ttt_move') {
+                    processTTTMove(data.index, false);
+                }
+                else if(data.type === 'chess_move') {
+                    processChessMove(data.move, false);
+                }
+                else if(data.type === 'restart_game') {
+                    initGameEngine(data.game, false);
+                    addSystemMsg(`${opponentUsername} restarted the board.`);
+                }
+                else if(data.type === 'quit_game') {
+                    quitToLobbyLocal();
+                    addSystemMsg(`${opponentUsername} left the game.`);
+                }
+            });
+
+            conn.on('close', () => {
+                resetConnectionState();
+            });
+            conn.on('error', () => {
+                resetConnectionState();
+            });
+        }
+
+        function resetConnectionState() {
+            isConnected = false;
+            myPlayerNum = 0;
+            addSystemMsg("Opponent disconnected.");
+            document.getElementById('opponent-badge').innerText = "Singleplayer";
+            document.getElementById('opponent-badge').classList.add('bg-slate-900', 'text-emerald-500');
+            document.getElementById('opponent-badge').classList.remove('bg-emerald-500/10', 'text-emerald-400');
+            switchView('view-landing');
+        }
+
+        // Copy current Friend Code
+        function copyRoomID() {
+            const myIdText = document.getElementById('my-id').innerText;
+            if (myIdText && myIdText !== "Generating...") {
+                const tempInput = document.createElement("input");
+                tempInput.value = myIdText;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand("copy");
+                document.body.removeChild(tempInput);
+                addSystemMsg("Your Friend Code was copied!");
+            }
+        }
+
+        // --- Friends Directory (LocalStorage Persistent) ---
+        function saveFriend() {
+            const nameInput = document.getElementById('friend-name');
+            const idInput = document.getElementById('friend-id');
+            const name = nameInput.value.trim();
+            let id = idInput.value.trim().toUpperCase();
+
+            if (!name || !id) {
+                alert("Please fill in both name and Friend Code fields!");
+                return;
+            }
+
+            if (friends.some(f => f.id === id)) {
+                alert("This Friend Code is already registered!");
+                return;
+            }
+
+            friends.push({ name: name, id: id });
+            localStorage.setItem('p2p_arcade_friends', JSON.stringify(friends));
+            
+            nameInput.value = '';
+            idInput.value = '';
+            renderFriends();
+            addSystemMsg(`Saved friend "${name}" to your registry.`);
+        }
+
+        function deleteFriend(idToDelete) {
+            friends = friends.filter(f => f.id !== idToDelete);
+            localStorage.setItem('p2p_arcade_friends', JSON.stringify(friends));
+            renderFriends();
+        }
+
+        function loadFriends() {
+            const raw = localStorage.getItem('p2p_arcade_friends');
+            if (raw) {
+                try {
+                    friends = JSON.parse(raw);
+                } catch(e) {
+                    friends = [];
+                }
+            }
+            renderFriends();
+        }
+
+        function renderFriends() {
+            const container = document.getElementById('friends-list-container');
+            container.innerHTML = '';
+
+            if (friends.length === 0) {
+                container.innerHTML = `<p class="text-xs text-emerald-600/70 italic text-center py-4">No saved friends yet.</p>`;
+                return;
+            }
+
+            friends.forEach(f => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between bg-slate-900 border border-emerald-900/20 px-3 py-1.5 rounded-xl text-xs gap-2";
+                div.innerHTML = `
+                    <div class="flex-grow min-w-0">
+                        <p class="font-bold text-white truncate">${f.name}</p>
+                        <p class="text-[9px] text-emerald-700 font-bold select-all tracking-wider">${f.id}</p>
+                    </div>
+                    <div class="flex gap-1.5 items-center">
+                        <button onclick="joinRoom('${f.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1 rounded-md transition-all active:scale-95 text-[10px]">Connect</button>
+                        <button onclick="deleteFriend('${f.id}')" class="text-emerald-700 hover:text-red-400 font-bold text-sm px-1">&times;</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- Game Setup / Sync Dispatch ---
+        function selectGame(gameKey) {
+            if(!isConnected) return;
+            activeGame = gameKey;
+            conn.send({ type: 'game_select', game: gameKey });
+            initGameEngine(gameKey, true);
+        }
+
+        function initGameEngine(gameKey, isInitiator) {
+            currentPlayerTurn = 1; // Player 1 (Host or White in Chess) always goes first
+            activeGame = gameKey;
+            if (gameKey === 'c4') {
+                setupC4Board();
+                switchView('view-c4');
+            } else if (gameKey === 'ttt') {
+                setupTTTBoard();
+                switchView('view-ttt');
+            } else if (gameKey === 'chess') {
+                setupChessBoard();
+                switchView('view-chess');
+            }
+        }
+
+        function quitToLobby() {
+            if(conn && conn.open) {
+                conn.send({ type: 'quit_game' });
+            }
+            quitToLobbyLocal();
+        }
+
+        function quitToLobbyLocal() {
+            activeGame = null;
+            isBotGame = false;
+            opponentUsername = "Opponent";
+            document.getElementById('opponent-badge').innerText = isConnected ? "Connected" : "Singleplayer";
+            switchView('view-landing');
+        }
+
+        function resetGame(gameKey) {
+            if(conn && conn.open) {
+                conn.send({ type: 'restart_game', game: gameKey });
+            }
+            initGameEngine(gameKey, true);
+        }
+
+        // --- Connect 4 Engine ---
+        function setupC4Board() {
+            c4Active = true;
+            c4Board = [];
+            const gridContainer = document.getElementById('c4-grid');
+            gridContainer.innerHTML = '';
+
+            for (let r = 0; r < C4_ROWS; r++) {
+                c4Board[r] = [];
+                for (let c = 0; c < C4_COLS; c++) {
+                    c4Board[r][c] = 0;
+                    const cell = document.createElement('div');
+                    cell.id = `c4-${r}-${c}`;
+                    cell.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full c4-cell-empty transition-all duration-300";
+                    gridContainer.appendChild(cell);
+                }
+            }
+            updateC4TurnDisplay();
+        }
+
+        function updateC4TurnDisplay() {
+            const status = document.getElementById('c4-turn-status');
+            if(!c4Active) return;
+            if(currentPlayerTurn === myPlayerNum) {
+                status.innerText = "Your Turn";
+                status.className = "text-sm font-extrabold px-3 py-1.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+            } else {
+                status.innerText = `${opponentUsername}'s Turn`;
+                status.className = "text-sm font-extrabold px-3 py-1.5 rounded-full bg-slate-900 text-emerald-600 border border-emerald-950";
+            }
+        }
+
+        function dropC4(col) {
+            if (!c4Active || currentPlayerTurn !== myPlayerNum) return;
+            processC4Move(col, true);
+        }
+
+        function processC4Move(col, isLocal) {
+            let row = -1;
+            for (let r = C4_ROWS - 1; r >= 0; r--) {
+                if (c4Board[r][col] === 0) {
+                    row = r;
+                    break;
+                }
+            }
+            if (row === -1) return; // Column full
+
+            c4Board[row][col] = currentPlayerTurn;
+            const cell = document.getElementById(`c4-${row}-${col}`);
+            cell.classList.remove('c4-cell-empty');
+            if (currentPlayerTurn === 1) {
+                cell.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full c4-token-red neon-shadow-red transition-all duration-300";
+            } else {
+                cell.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full c4-token-yellow neon-shadow-yellow transition-all duration-300";
+            }
+
+            if (isLocal && isConnected) {
+                conn.send({ type: 'c4_move', col: col });
+            }
+
+            if (checkC4Win(row, col)) {
+                c4Active = false;
+                const status = document.getElementById('c4-turn-status');
+                if (currentPlayerTurn === myPlayerNum) {
+                    status.innerText = "🎉 You Won! 🎉";
+                    status.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                    calculateEloChange(1);
+                } else {
+                    status.innerText = `🏆 ${opponentUsername} Wins!`;
+                    status.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-red-500/20 text-red-400 border border-red-500/30";
+                    calculateEloChange(0);
+                }
+                return;
+            }
+
+            currentPlayerTurn = currentPlayerTurn === 1 ? 2 : 1;
+            updateC4TurnDisplay();
+
+            if (isBotGame && currentPlayerTurn === 2 && c4Active) {
+                setTimeout(runC4AI, 700);
+            }
+        }
+
+        function checkC4Win(r, c) {
+            const player = c4Board[r][c];
+            const directions = [[0,1], [1,0], [1,1], [1,-1]];
+            for (let [dr, dc] of directions) {
+                let count = 1;
+                for(let i=1; i<4; i++) {
+                    let nr = r + dr*i, nc = c + dc*i;
+                    if(nr>=0 && nr<C4_ROWS && nc>=0 && nc<C4_COLS && c4Board[nr][nc] === player) count++;
+                    else break;
+                }
+                for(let i=1; i<4; i++) {
+                    let nr = r - dr*i, nc = c - dc*i;
+                    if(nr>=0 && nr<C4_ROWS && nc>=0 && nc<C4_COLS && c4Board[nr][nc] === player) count++;
+                    else break;
+                }
+                if(count >= 4) return true;
+            }
+            return false;
+        }
+
+        function runC4AI() {
+            let validCols = [];
+            for(let c=0; c<C4_COLS; c++) {
+                if(getLowestEmptyRowC4(c) !== -1) validCols.push(c);
+            }
+            if (validCols.length === 0) return;
+
+            let chosenCol = validCols[0];
+            if (selectedDifficulty === 'easy') {
+                chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
+            } else if (selectedDifficulty === 'medium') {
+                let winMove = findC4SimulatedMove(2);
+                let blockMove = findC4SimulatedMove(1);
+                if (winMove !== null) chosenCol = winMove;
+                else if (blockMove !== null) chosenCol = blockMove;
+                else chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
+            } else if (selectedDifficulty === 'hard') {
+                let bestScore = -Infinity;
+                let bestCols = [];
+                for (let c of validCols) {
+                    let r = getLowestEmptyRowC4(c);
+                    let score = 0;
+                    if (c === 3) score += 15;
+                    else if (c === 2 || c === 4) score += 5;
+
+                    c4Board[r][c] = 2;
+                    if (checkC4Win(r, c)) score += 1000;
+                    c4Board[r][c] = 0;
+
+                    c4Board[r][c] = 1;
+                    if (checkC4Win(r, c)) score += 500;
+                    c4Board[r][c] = 0;
+
+                    if (r > 0) {
+                        c4Board[r][c] = 2;
+                        c4Board[r-1][c] = 1;
+                        if (checkC4Win(r-1, c)) score -= 300;
+                        c4Board[r-1][c] = 0;
+                        c4Board[r][c] = 0;
+                    }
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestCols = [c];
+                    } else if (score === bestScore) {
+                        bestCols.push(c);
+                    }
+                }
+                chosenCol = bestCols[Math.floor(Math.random() * bestCols.length)];
+            }
+            processC4Move(chosenCol, false);
+        }
+
+        function getLowestEmptyRowC4(col) {
+            for (let r = C4_ROWS - 1; r >= 0; r--) {
+                if (c4Board[r][col] === 0) return r;
+            }
+            return -1;
+        }
+
+        function findC4SimulatedMove(player) {
+            for (let c = 0; c < C4_COLS; c++) {
+                let r = getLowestEmptyRowC4(c);
+                if (r !== -1) {
+                    c4Board[r][c] = player;
+                    let won = checkC4Win(r, c);
+                    c4Board[r][c] = 0;
+                    if (won) return c;
+                }
+            }
+            return null;
+        }
+
+        // --- Tic-Tac-Toe Engine ---
+        function setupTTTBoard() {
+            tttActive = true;
+            tttBoard = Array(9).fill("");
+            for(let i=0; i<9; i++) {
+                const btn = document.getElementById('ttt-${i}');
+                btn.innerText = "";
+                btn.className = "h-24 w-full bg-slate-900 border border-emerald-950 hover:bg-emerald-900/10 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none";
+            }
+            updateTTTTurnDisplay();
+        }
+
+        function updateTTTTurnDisplay() {
+            const status = document.getElementById('ttt-turn-status');
+            if(!tttActive) return;
+            if(currentPlayerTurn === myPlayerNum) {
+                status.innerText = "Your Turn (X)";
+                status.className = "text-sm font-extrabold px-3 py-1.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+            } else {
+                status.innerText = `${opponentUsername}'s Turn (O)`;
+                status.className = "text-sm font-extrabold px-3 py-1.5 rounded-full bg-slate-900 text-emerald-600 border border-emerald-950";
+            }
+        }
+
+        function playTTT(index) {
+            if (!tttActive || currentPlayerTurn !== myPlayerNum || tttBoard[index] !== "") return;
+            processTTTMove(index, true);
+        }
+
+        function processTTTMove(index, isLocal) {
+            const marker = currentPlayerTurn === 1 ? "X" : "O";
+            tttBoard[index] = marker;
+            
+            const btn = document.getElementById(`ttt-${index}`);
+            btn.innerText = marker;
+            btn.className = `h-24 w-full bg-slate-900 border border-emerald-950 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none ${currentPlayerTurn === 1 ? 'text-red-500 neon-shadow-red' : 'text-yellow-500 neon-shadow-yellow'}`;
+
+            if(isLocal && isConnected) {
+                conn.send({ type: 'ttt_move', index: index });
+            }
+
+            if(checkTTTWin()) {
+                tttActive = false;
+                const status = document.getElementById('ttt-turn-status');
+                if (currentPlayerTurn === myPlayerNum) {
+                    status.innerText = "🎉 You Won! 🎉";
+                    status.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                    calculateEloChange(1);
+                } else {
+                    status.innerText = `🏆 ${opponentUsername} Wins!`;
+                    status.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-red-500/20 text-red-400 border border-red-500/30";
+                    calculateEloChange(0);
+                }
+                return;
+            }
+
+            if(!tttBoard.includes("")) {
+                tttActive = false;
+                const status = document.getElementById('ttt-turn-status');
+                status.innerText = "🤝 Tie Game! 🤝";
+                status.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-slate-800 text-slate-300 border border-emerald-950";
+                calculateEloChange(0.5);
+                return;
+            }
+
+            currentPlayerTurn = currentPlayerTurn === 1 ? 2 : 1;
+            updateTTTTurnDisplay();
+
+            if (isBotGame && currentPlayerTurn === 2 && tttActive) {
+                setTimeout(runTTTAI, 600);
+            }
+        }
+
+        function checkTTTWin() {
+            const wins = [
+                [0,1,2], [3,4,5], [6,7,8], 
+                [0,3,6], [1,4,7], [2,5,8], 
+                [0,4,8], [2,4,6]           
+            ];
+            return wins.some(comb => {
+                return tttBoard[comb[0]] !== "" && 
+                       tttBoard[comb[0]] === tttBoard[comb[1]] && 
+                       tttBoard[comb[0]] === tttBoard[comb[2]];
+            });
+        }
+
+        function runTTTAI() {
+            let availableIndices = [];
+            for (let i = 0; i < 9; i++) {
+                if (tttBoard[i] === "") availableIndices.push(i);
+            }
+            if (availableIndices.length === 0) return;
+
+            let move = availableIndices[0];
+            if (selectedDifficulty === 'easy') {
+                move = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+            } else if (selectedDifficulty === 'medium') {
+                let winMove = findTTTSimulatedMove("O");
+                let blockMove = findTTTSimulatedMove("X");
+                if (winMove !== null) move = winMove;
+                else if (blockMove !== null) move = blockMove;
+                else move = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+            } else if (selectedDifficulty === 'hard') {
+                let bestScore = -Infinity;
+                for (let i of availableIndices) {
+                    tttBoard[i] = "O";
+                    let score = minimaxTTT(tttBoard, 0, false);
+                    tttBoard[i] = "";
+                    if (score > bestScore) {
+                        bestScore = score;
+                        move = i;
+                    }
+                }
+            }
+            processTTTMove(move, false);
+        }
+
+        function findTTTSimulatedMove(marker) {
+            for (let i = 0; i < 9; i++) {
+                if (tttBoard[i] === "") {
+                    tttBoard[i] = marker;
+                    let won = checkTTTWin();
+                    tttBoard[i] = "";
+                    if (won) return i;
+                }
+            }
+            return null;
+        }
+
+        function minimaxTTT(boardState, depth, isMaximizing) {
+            if (checkTTTWin()) return isMaximizing ? -10 + depth : 10 - depth;
+            if (!boardState.includes("")) return 0;
+
+            if (isMaximizing) {
+                let bestScore = -Infinity;
+                for (let i = 0; i < 9; i++) {
+                    if (boardState[i] === "") {
+                        boardState[i] = "O";
+                        let score = minimaxTTT(boardState, depth + 1, false);
+                        boardState[i] = "";
+                        bestScore = Math.max(score, bestScore);
+                    }
+                }
+                return bestScore;
+            } else {
+                let bestScore = Infinity;
+                for (let i = 0; i < 9; i++) {
+                    if (boardState[i] === "") {
+                        boardState[i] = "X";
+                        let score = minimaxTTT(boardState, depth + 1, true);
+                        boardState[i] = "";
+                        bestScore = Math.min(score, bestScore);
+                    }
+                }
+                return bestScore;
+            }
+        }
+
+
+        // --- CHESS ENGINE ---
+        const CHESS_PIECE_SYMBOLS = {
+            'w': { 'p': '♙', 'r': '♖', 'n': '♘', 'b': '♗', 'q': '♕', 'k': '♔' },
+            'b': { 'p': '♟', 'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚' }
+        };
+
+        const CHESS_PIECE_IMAGES = {
+            'w': {
+                'k': 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
+                'q': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
+                'r': 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
+                'b': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
+                'n': 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
+                'p': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg'
+            },
+            'b': {
+                'k': 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
+                'q': 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg',
+                'r': 'https://upload.wikimedia.org/wikipedia/commons/ff/ff/Chess_rdt45.svg',
+                'b': 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg',
+                'n': 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg',
+                'p': 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg'
+            }
+        };
+
+        // Basic Piece-Square Values for Positional Evaluation (Bot Hard Heuristics)
+        const CHESS_PIECE_VALUES = { 'p': 100, 'n': 320, 'b': 330, 'r': 500, 'q': 900, 'k': 20000 };
+        
+        const PAWN_PST = [
+            [0,  0,  0,  0,  0,  0,  0,  0],
+            [50, 50, 50, 50, 50, 50, 50, 50],
+            [10, 10, 20, 30, 30, 20, 10, 10],
+            [5,  5, 10, 25, 25, 10,  5,  5],
+            [0,  0,  0, 20, 20,  0,  0,  0],
+            [5, -5,-10,  0,  0,-10, -5,  5],
+            [5, 10, 10,-20,-20, 10, 10,  5],
+            [0,  0,  0,  0,  0,  0,  0,  0]
+        ];
+
+        const KNIGHT_PST = [
+            [-50,-40,-30,-30,-30,-30,-40,-50],
+            [-40,-20,  0,  0,  0,  0,-20,-40],
+            [-30,  0, 10, 15, 15, 10,  0,-30],
+            [-30,  5, 15, 20, 20, 15,  5,-30],
+            [-30,  0, 15, 20, 20, 15,  0,-30],
+            [-30,  5, 10, 15, 15, 10,  5,-30],
+            [-40,-20,  0,  5,  5,  0,-20,-40],
+            [-50,-40,-30,-30,-30,-30,-40,-50]
+        ];
+
+        const BISHOP_PST = [
+            [-20,-10,-10,-10,-10,-10,-10,-20],
+            [-10,  0,  0,  0,  0,  0,  0,-10],
+            [-10,  0,  5, 10, 10,  5,  0,-10],
+            [-10,  5,  5, 10, 10,  5,  5,-10],
+            [-10,  0, 10, 10, 10, 10,  0,-10],
+            [-10, 10, 10, 10, 10, 10, 10,-10],
+            [-10,  5,  0,  0,  0,  0,  5,-10],
+            [-20,-10,-10,-10,-10,-10,-10,-20]
+        ];
+
+        const ROOK_PST = [
+            [0,  0,  0,  0,  0,  0,  0,  0],
+            [5, 10, 10, 10, 10, 10, 10,  5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [-5,  0,  0,  0,  0,  0,  0, -5],
+            [0,  0,  0,  5,  5,  0,  0,  0]
+        ];
+
+        const QUEEN_PST = [
+            [-20,-10,-10, -5, -5,-10,-10,-20],
+            [-10,  0,  0,  0,  0,  0,  0,-10],
+            [-10,  0,  5,  5,  5,  5,  0,-10],
+            [-5,  0,  5,  5,  5,  5,  0, -5],
+            [0,  0,  5,  5,  5,  5,  0, -5],
+            [-10,  5,  5,  5,  5,  5,  0,-10],
+            [-10,  0,  5,  0,  0,  5,  0,-10],
+            [-20,-10,-10, -5, -5,-10,-10,-20]
+        ];
+
+        const KING_PST_MID = [
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-30,-40,-40,-50,-50,-40,-40,-30],
+            [-20,-30,-30,-40,-40,-30,-30,-20],
+            [-10,-20,-20,-20,-20,-20,-20,-10],
+            [20, 20,  0,  0,  0,  0, 20, 20],
+            [20, 30, 10,  0,  0, 10, 30, 20]
+        ];
+
+        function setupChessBoard() {
+            chessInstance = new Chess();
+            selectedChessSquare = null;
+            legalMovesForSelection = [];
+            chessPromotionPendingMove = null;
+            
+            renderChessboard();
+            updateChessTurnDisplay();
+            updateCapturedPieces();
+        }
+
+        function renderChessboard() {
+            const gridContainer = document.getElementById('chess-grid');
+            gridContainer.innerHTML = '';
+
+            const board = chessInstance.board();
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const squareObj = board[r][c];
+                    const squareName = String.fromCharCode(97 + c) + (8 - r);
+
+                    const squareDiv = document.createElement('div');
+                    squareDiv.id = `chess-sq-${squareName}`;
+                    
+                    const isDark = (r + c) % 2 === 1;
+                    squareDiv.className = `w-full h-full flex items-center justify-center cursor-pointer transition-all ${isDark ? 'chess-square-dark' : 'chess-square-light'}`;
+                    
+                    if (selectedChessSquare === squareName) {
+                        squareDiv.classList.add('chess-square-selected');
+                    }
+                    
+                    if (legalMovesForSelection.includes(squareName)) {
+                        squareDiv.classList.add('chess-square-highlight');
+                    }
+
+                    if (squareObj) {
+                        // Render SVG image instead of raw text
+                        const img = document.createElement('img');
+                        img.src = CHESS_PIECE_IMAGES[squareObj.color][squareObj.type];
+                        img.className = "w-[85%] h-[85%] object-contain transition-all duration-150 select-none pointer-events-none hover:scale-110";
+                        img.alt = squareObj.type;
+                        // Resilient inline text fallback in case network boundary cuts off Wiki CDN
+                        img.onerror = function() {
+                            this.outerHTML = `<span class="chess-piece ${squareObj.color === 'w' ? 'text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]' : 'text-slate-950 drop-shadow-[0_2px_4px_rgba(255,255,255,0.3)]'}">${CHESS_PIECE_SYMBOLS[squareObj.color][squareObj.type]}</span>`;
+                        };
+                        squareDiv.appendChild(img);
+                    }
+
+                    squareDiv.onclick = () => handleChessSquareClick(squareName);
+                    gridContainer.appendChild(squareDiv);
+                }
+            }
+        }
+
+        function handleChessSquareClick(squareName) {
+            if (chessInstance.game_over()) return;
+            
+            if (!isBotGame && isConnected) {
+                const turnColor = chessInstance.turn();
+                const expectedColor = myPlayerNum === 1 ? 'w' : 'b';
+                if (turnColor !== expectedColor) return;
+            } else if (isBotGame && chessInstance.turn() === 'b') {
+                return;
+            }
+
+            const piece = chessInstance.get(squareName);
+
+            if (legalMovesForSelection.includes(squareName)) {
+                const moves = chessInstance.moves({ square: selectedChessSquare, verbose: true });
+                const matchingMove = moves.find(m => m.to === squareName);
+                
+                if (matchingMove) {
+                    if (matchingMove.flags.includes('p')) {
+                        chessPromotionPendingMove = { from: selectedChessSquare, to: squareName };
+                        // Dynamically update promotion modal button SVG graphics to match user piece colors
+                        const turnColor = chessInstance.turn();
+                        document.getElementById('promo-q').innerHTML = `<img src="${CHESS_PIECE_IMAGES[turnColor]['q']}" class="w-12 h-12 object-contain select-none pointer-events-none">`;
+                        document.getElementById('promo-r').innerHTML = `<img src="${CHESS_PIECE_IMAGES[turnColor]['r']}" class="w-12 h-12 object-contain select-none pointer-events-none">`;
+                        document.getElementById('promo-b').innerHTML = `<img src="${CHESS_PIECE_IMAGES[turnColor]['b']}" class="w-12 h-12 object-contain select-none pointer-events-none">`;
+                        document.getElementById('promo-n').innerHTML = `<img src="${CHESS_PIECE_IMAGES[turnColor]['n']}" class="w-12 h-12 object-contain select-none pointer-events-none">`;
+
+                        document.getElementById('chess-promotion-modal').classList.remove('hidden');
+                        return;
+                    } else {
+                        executeChessMove({ from: selectedChessSquare, to: squareName });
+                    }
+                }
+                
+                selectedChessSquare = null;
+                legalMovesForSelection = [];
+                renderChessboard();
+                return;
+            }
+
+            if (piece && piece.color === chessInstance.turn()) {
+                selectedChessSquare = squareName;
+                const rawMoves = chessInstance.moves({ square: squareName, verbose: true });
+                legalMovesForSelection = rawMoves.map(m => m.to);
+            } else {
+                selectedChessSquare = null;
+                legalMovesForSelection = [];
+            }
+
+            renderChessboard();
+        }
+
+        function selectPromotion(pieceType) {
+            document.getElementById('chess-promotion-modal').classList.add('hidden');
+            if (chessPromotionPendingMove) {
+                executeChessMove({
+                    from: chessPromotionPendingMove.from,
+                    to: chessPromotionPendingMove.to,
+                    promotion: pieceType
+                });
+                chessPromotionPendingMove = null;
+            }
+        }
+
+        function executeChessMove(moveObj) {
+            const resultMove = chessInstance.move(moveObj);
+            if (resultMove) {
+                selectedChessSquare = null;
+                legalMovesForSelection = [];
+                renderChessboard();
+                updateChessTurnDisplay();
+                updateCapturedPieces();
+
+                if (!isBotGame && isConnected) {
+                    conn.send({ type: 'chess_move', move: moveObj });
+                }
+
+                if (checkChessGameOver()) return;
+
+                if (isBotGame && chessInstance.turn() === 'b') {
+                    setTimeout(runChessAI, 750);
+                }
+            }
+        }
+
+        function processChessMove(moveObj, isLocal) {
+            chessInstance.move(moveObj);
+            renderChessboard();
+            updateChessTurnDisplay();
+            updateCapturedPieces();
+            checkChessGameOver();
+        }
+
+        function updateChessTurnDisplay() {
+            const statusDiv = document.getElementById('chess-turn-status');
+            if (chessInstance.game_over()) return;
+
+            const turn = chessInstance.turn() === 'w' ? "White" : "Black";
+            statusDiv.innerText = `${turn}'s Turn`;
+            
+            if (chessInstance.in_check()) {
+                statusDiv.innerText += " (Check!)";
+                statusDiv.className = "text-sm font-extrabold px-3 py-1.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30";
+            } else {
+                statusDiv.className = "text-sm font-extrabold px-3 py-1.5 rounded-full bg-slate-900 border border-emerald-800 text-emerald-300";
+            }
+        }
+
+        function updateCapturedPieces() {
+            const initialPieces = {
+                'p': 8, 'r': 2, 'n': 2, 'b': 2, 'q': 1
+            };
+
+            const currentWhitePieces = { 'p': 0, 'r': 0, 'n': 0, 'b': 0, 'q': 0 };
+            const currentBlackPieces = { 'p': 0, 'r': 0, 'n': 0, 'b': 0, 'q': 0 };
+
+            const board = chessInstance.board();
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const sq = board[r][c];
+                    if (sq && sq.type !== 'k') {
+                        if (sq.color === 'w') currentWhitePieces[sq.type]++;
+                        else currentBlackPieces[sq.type]++;
+                    }
+                }
+            }
+
+            const shelfWhite = document.getElementById('chess-captured-by-white');
+            const shelfBlack = document.getElementById('chess-captured-by-black');
+
+            shelfWhite.innerHTML = '';
+            shelfBlack.innerHTML = '';
+
+            // Black pieces captured by White player - Render mini SVGs on white player shelf
+            for (let type in initialPieces) {
+                let diff = initialPieces[type] - currentBlackPieces[type];
+                for(let i=0; i < diff; i++) {
+                    const img = document.createElement('img');
+                    img.src = CHESS_PIECE_IMAGES['b'][type];
+                    img.className = "w-6 h-6 object-contain inline-block mr-0.5 select-none pointer-events-none";
+                    img.onerror = function() {
+                        this.outerHTML = `<span class="text-sm font-bold leading-none inline-block mr-0.5">${CHESS_PIECE_SYMBOLS['b'][type]}</span>`;
+                    };
+                    shelfWhite.appendChild(img);
+                }
+            }
+
+            // White pieces captured by Black player - Render mini SVGs on black player shelf
+            for (let type in initialPieces) {
+                let diff = initialPieces[type] - currentWhitePieces[type];
+                for(let i=0; i < diff; i++) {
+                    const img = document.createElement('img');
+                    img.src = CHESS_PIECE_IMAGES['w'][type];
+                    img.className = "w-6 h-6 object-contain inline-block mr-0.5 select-none pointer-events-none";
+                    img.onerror = function() {
+                        this.outerHTML = `<span class="text-sm font-bold leading-none inline-block mr-0.5">${CHESS_PIECE_SYMBOLS['w'][type]}</span>`;
+                    };
+                    shelfBlack.appendChild(img);
+                }
+            }
+        }
+
+        function checkChessGameOver() {
+            if (chessInstance.game_over()) {
+                const statusDiv = document.getElementById('chess-turn-status');
+                
+                if (chessInstance.in_checkmate()) {
+                    const winnerColor = chessInstance.turn() === 'w' ? 'Black' : 'White';
+                    statusDiv.innerText = `🏆 Checkmate! ${winnerColor} Wins!`;
+                    statusDiv.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                    
+                    if (winnerColor === 'White') {
+                        if (myPlayerNum === 1) calculateEloChange(1);
+                        else calculateEloChange(0);
+                    } else {
+                        if (myPlayerNum === 2) calculateEloChange(1);
+                        else calculateEloChange(0);
+                    }
+                } else if (chessInstance.in_draw() || chessInstance.in_stalemate() || chessInstance.in_threefold_repetition()) {
+                    statusDiv.innerText = "🤝 Draw Game!";
+                    statusDiv.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-slate-800 text-slate-300 border border-emerald-950";
+                    calculateEloChange(0.5);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        // --- Chess Bot AI Execution (Easy, Medium, Hard) ---
+        function runChessAI() {
+            const moves = chessInstance.moves({ verbose: true });
+            if (moves.length === 0) return;
+
+            let chosenMove = moves[0];
+
+            if (selectedDifficulty === 'easy') {
+                chosenMove = moves[Math.floor(Math.random() * moves.length)];
+            } 
+            else if (selectedDifficulty === 'medium') {
+                let bestScore = -10000;
+                let candidates = [];
+
+                for (let m of moves) {
+                    let score = 0;
+                    if (m.captured) {
+                        score += CHESS_PIECE_VALUES[m.captured];
+                    }
+                    if (score > bestScore) {
+                        bestScore = score;
+                        candidates = [m];
+                    } else if (score === bestScore) {
+                        candidates.push(m);
+                    }
+                }
+                chosenMove = candidates[Math.floor(Math.random() * candidates.length)];
+            } 
+            else if (selectedDifficulty === 'hard') {
+                let bestMove = minimaxAlphaBetaChess(2, -Infinity, Infinity, true);
+                chosenMove = bestMove ? bestMove : moves[Math.floor(Math.random() * moves.length)];
+            }
+
+            executeChessMove({
+                from: chosenMove.from,
+                to: chosenMove.to,
+                promotion: chosenMove.promotion || 'q'
+            });
+        }
+
+        function evaluateChessBoard(board) {
+            let totalEvaluation = 0;
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const piece = board[r][c];
+                    if (piece) {
+                        let value = CHESS_PIECE_VALUES[piece.type];
+                        
+                        if (piece.type === 'p') {
+                            value += (piece.color === 'w' ? PAWN_PST[r][c] : PAWN_PST[7-r][c]);
+                        } else if (piece.type === 'n') {
+                            value += KNIGHT_PST[r][c];
+                        } else if (piece.type === 'b') {
+                            value += BISHOP_PST[r][c];
+                        } else if (piece.type === 'r') {
+                            value += (piece.color === 'w' ? ROOK_PST[r][c] : ROOK_PST[7-r][c]);
+                        } else if (piece.type === 'q') {
+                            value += QUEEN_PST[r][c];
+                        } else if (piece.type === 'k') {
+                            value += KING_PST_MID[r][c];
+                        }
+
+                        if (piece.color === 'w') {
+                            totalEvaluation += value;
+                        } else {
+                            totalEvaluation -= value;
+                        }
+                    }
+                }
+            }
+            return totalEvaluation;
+        }
+
+        function minimaxAlphaBetaChess(depth, alpha, beta, isMaximizingBlack) {
+            let moves = chessInstance.moves({ verbose: true });
+            
+            moves.sort((a, b) => {
+                let scoreA = a.captured ? CHESS_PIECE_VALUES[a.captured] : 0;
+                let scoreB = b.captured ? CHESS_PIECE_VALUES[b.captured] : 0;
+                return scoreB - scoreA;
+            });
+
+            if (depth === 0 || moves.length === 0) {
+                return null;
+            }
+
+            let bestMove = null;
+            let bestScore = isMaximizingBlack ? -Infinity : Infinity;
+
+            for (let m of moves) {
+                chessInstance.move({ from: m.from, to: m.to, promotion: m.promotion || 'q' });
+                
+                let score = minimaxAlphaBetaSearch(depth - 1, alpha, beta, !isMaximizingBlack);
+                chessInstance.undo();
+
+                if (isMaximizingBlack) {
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = m;
+                    }
+                    alpha = Math.max(alpha, bestScore);
+                } else {
+                    if (score < bestScore) {
+                        bestScore = score;
+                        bestMove = m;
+                    }
+                    beta = Math.min(beta, bestScore);
+                }
+
+                if (beta <= alpha) break;
+            }
+
+            return bestMove;
+        }
+
+        function minimaxAlphaBetaSearch(depth, alpha, beta, isMaximizingWhite) {
+            if (depth === 0 || chessInstance.game_over()) {
+                return evaluateChessBoard(chessInstance.board());
+            }
+
+            let moves = chessInstance.moves({ verbose: true });
+            
+            if (isMaximizingWhite) {
+                let bestScore = -Infinity;
+                for (let m of moves) {
+                    chessInstance.move({ from: m.from, to: m.to, promotion: m.promotion || 'q' });
+                    bestScore = Math.max(bestScore, minimaxAlphaBetaSearch(depth - 1, alpha, beta, false));
+                    chessInstance.undo();
+                    alpha = Math.max(alpha, bestScore);
+                    if (beta <= alpha) break;
+                }
+                return bestScore;
+            } else {
+                let bestScore = Infinity;
+                for (let m of moves) {
+                    chessInstance.move({ from: m.from, to: m.to, promotion: m.promotion || 'q' });
+                    bestScore = Math.min(bestScore, minimaxAlphaBetaSearch(depth - 1, alpha, beta, true));
+                    chessInstance.undo();
+                    beta = Math.min(beta, bestScore);
+                    if (beta <= alpha) break;
+                }
+                return bestScore;
+            }
+        }
+
+
+        // --- CHAT WINDOW LOGIC ---
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if(!message) return;
+
+            addChatMessage("You", message, true);
+            if(conn && conn.open) {
+                conn.send({ type: 'chat', message: message });
+            }
+            input.value = '';
+        }
+
+        // Output message balloon templates
+        function addChatMessage(user, msg, isMe) {
+            const box = document.getElementById('chat-messages');
+            const el = document.createElement('div');
+            el.className = "flex flex-col text-sm " + (isMe ? "items-end" : "items-start");
+            
+            const bubbleBg = isMe ? "bg-emerald-600/10 border border-emerald-500/20 text-emerald-100" : "bg-slate-900 text-emerald-100 border border-emerald-950";
+            
+            el.innerHTML = `
+                <span class="text-xs text-emerald-600/70 mb-0.5">${user}</span>
+                <div class="px-3.5 py-2 rounded-2xl max-w-[85%] ${bubbleBg} break-words leading-relaxed">${msg}</div>
+            `;
+            box.appendChild(el);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function addSystemMsg(text) {
+            const box = document.getElementById('chat-messages');
+            const el = document.createElement('div');
+            el.className = "text-center text-xs text-emerald-500 bg-emerald-950/20 py-1.5 px-3 rounded-lg border border-emerald-900/30 my-2";
+            el.innerText = text;
+            box.appendChild(el);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // Run setup on load
+        window.onload = initPeer;
+    </script>
+</body>
+</html>
