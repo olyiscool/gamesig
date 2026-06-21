@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arcade Hub - Play Online</title>
+    <!-- Tailwind CSS for modern utility styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS for direct WebRTC connection -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: radial-gradient(circle at top left, #0f172a, #020617);
+        }
+        /* Custom scrollbar for chat */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 9999px;
+        }
+        /* Connect 4 styling */
+        .c4-cell {
+            box-shadow: inset 0 4px 6px -1px rgb(0 0 0 / 0.5), inset 0 2px 4px -2px rgb(0 0 0 / 0.5);
+        }
+        /* Neon glows */
+        .neon-shadow-red {
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+        }
+        .neon-shadow-yellow {
+            box-shadow: 0 0 15px rgba(234, 179, 8, 0.4);
+        }
+        .neon-shadow-blue {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100 flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-slate-800 bg-slate-950/50 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.5 5.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM1.5 21.75a8.25 8.25 0 0 1 13.8-6.25m4.2 0a5.25 5.25 0 1 1-10.5 0 5.25 5.25 0 0 1 10.5 0Zm-10.5-6H4.5m10.5 0H18M4.5 9h15"></path></svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">ARCADE LOBBY</h1>
+                    <p class="text-xs text-slate-400">Direct peer-to-peer multiplayer</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3 bg-slate-900/80 p-1.5 rounded-xl border border-slate-800">
+                <span class="text-xs text-slate-400 pl-3">Your Nickname:</span>
+                <input type="text" id="username" value="Player" onchange="updateUsername()" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-sm font-semibold text-white focus:outline-none focus:border-indigo-500 w-32 sm:w-40 transition-all">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col lg:flex-row gap-6">
+        
+        <!-- Left Column: Primary Game / Dashboard View -->
+        <div class="flex-grow flex flex-col bg-slate-900/40 rounded-3xl border border-slate-800 p-6 min-h-[500px]">
+            
+            <!-- VIEW 1: Premium Game Landing (Replicating user sketch) -->
+            <div id="view-landing" class="flex-grow flex flex-col justify-center py-6">
+                <div class="text-center mb-10">
+                    <span class="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-xs font-semibold text-indigo-400 uppercase tracking-wider">P2P Games Serverless Portal</span>
+                    <h2 class="text-3xl font-extrabold tracking-tight mt-3">Select a Game</h2>
+                    <p class="text-slate-400 text-sm mt-1">Choose your battlefield. Tap "PLAY" to configure or join a custom lobby.</p>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto w-full px-4">
+                    <!-- Connect 4 Landing Card -->
+                    <div class="flex flex-col items-center bg-slate-950/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl transition-all hover:border-blue-500/40">
+                        <h3 class="text-2xl font-bold mb-4 tracking-wide">Connect 4</h3>
+                        
+                        <!-- PREVIEW HERE Box -->
+                        <div class="w-full h-44 bg-slate-950 rounded-xl border border-slate-800/80 flex items-center justify-center p-4 relative overflow-hidden group">
+                            <!-- Visual styling matching Connect 4 Preview -->
+                            <div class="grid grid-cols-7 gap-2 bg-blue-600/20 p-2.5 rounded-lg border border-blue-500/30">
+                                <div class="w-6 h-6 rounded-full bg-red-500/80 neon-shadow-red animate-pulse"></div>
+                                <div class="w-6 h-6 rounded-full bg-slate-900"></div>
+                                <div class="w-6 h-6 rounded-full bg-yellow-500/80 neon-shadow-yellow"></div>
+                                <div class="w-6 h-6 rounded-full bg-slate-900"></div>
+                                <div class="w-6 h-6 rounded-full bg-red-500/80 neon-shadow-red"></div>
+                                <div class="w-6 h-6 rounded-full bg-slate-900"></div>
+                                <div class="w-6 h-6 rounded-full bg-slate-900"></div>
+                                
+                                <div class="w-6 h-6 rounded-full bg-slate-900"></div>
+                                <div class="w-6 h-6 rounded-full bg-yellow-500/80 neon-shadow-yellow"></div>
+                                <div class="w-6 h-6 rounded-full bg-slate-900"></div>
+                                <div class="w-6 h-6 rounded-full bg-red-500/80 neon-shadow-red"></div>
+                                <div class="w-6 h-6 rounded-full bg-slate-900"></div>
+                                <div class="w-6 h-6 rounded-full bg-slate-900"></div>
+                                <div class="w-6 h-6 rounded-full bg-slate-900"></div>
+                            </div>
+                            <span class="absolute text-xs uppercase tracking-widest font-extrabold text-blue-400 bg-slate-950/80 px-3 py-1 rounded border border-blue-500/20">PREVIEW HERE</span>
+                        </div>
+
+                        <!-- Bold PLAY Button -->
+                        <button onclick="clickPlayGame('c4')" class="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white font-black text-2xl tracking-wider py-4 rounded-xl transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-blue-600/20 uppercase">
+                            Play
+                        </button>
+                    </div>
+
+                    <!-- Tic-Tac-Toe Landing Card -->
+                    <div class="flex flex-col items-center bg-slate-950/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl transition-all hover:border-emerald-500/40">
+                        <h3 class="text-2xl font-bold mb-4 tracking-wide">Tic-Tac-Toe</h3>
+                        
+                        <!-- PREVIEW HERE Box -->
+                        <div class="w-full h-44 bg-slate-950 rounded-xl border border-slate-800/80 flex items-center justify-center p-4 relative overflow-hidden">
+                            <!-- Visual styling matching Tic-Tac-Toe Preview -->
+                            <div class="grid grid-cols-3 gap-2 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/60 w-28">
+                                <div class="w-6 h-6 flex items-center justify-center font-black text-red-500 text-sm">X</div>
+                                <div class="w-6 h-6 flex items-center justify-center font-black text-yellow-500 text-sm">O</div>
+                                <div class="w-6 h-6"></div>
+                                <div class="w-6 h-6"></div>
+                                <div class="w-6 h-6 flex items-center justify-center font-black text-red-500 text-sm">X</div>
+                                <div class="w-6 h-6"></div>
+                                <div class="w-6 h-6 flex items-center justify-center font-black text-yellow-500 text-sm">O</div>
+                                <div class="w-6 h-6"></div>
+                                <div class="w-6 h-6 flex items-center justify-center font-black text-red-500 text-sm animate-pulse">X</div>
+                            </div>
+                            <span class="absolute text-xs uppercase tracking-widest font-extrabold text-emerald-400 bg-slate-950/80 px-3 py-1 rounded border border-emerald-500/20">PREVIEW HERE</span>
+                        </div>
+
+                        <!-- Bold PLAY Button -->
+                        <button onclick="clickPlayGame('ttt')" class="w-full mt-6 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-2xl tracking-wider py-4 rounded-xl transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-emerald-600/20 uppercase">
+                            Play
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: Matchmaking & Peer Lobby (With Friends List) -->
+            <div id="view-lobby" class="hidden flex-grow flex flex-col justify-center items-center py-6">
+                <div class="max-w-xl w-full text-center space-y-6">
+                    <div class="flex items-center justify-between">
+                        <button onclick="backToLanding()" class="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1">&larr; Change Game</button>
+                        <span id="selected-game-badge" class="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-xs font-semibold text-indigo-400 uppercase tracking-wider">Connect 4 Mode</span>
+                    </div>
+
+                    <div>
+                        <h2 class="text-3xl font-bold mt-2">Connect to Play</h2>
+                        <p class="text-slate-400 text-sm mt-1">Exchange Room IDs or use your Saved Friends list to instantly start.</p>
+                    </div>
+
+                    <!-- Room ID Area -->
+                    <div class="bg-slate-950/60 p-5 rounded-2xl border border-slate-800/80 space-y-3">
+                        <p class="text-xs font-semibold text-slate-400 tracking-wider uppercase">Your Room ID</p>
+                        <div class="flex items-center gap-2 bg-slate-900 p-2.5 rounded-xl border border-slate-800">
+                            <code id="my-id" class="flex-grow text-center text-lg font-bold text-indigo-400 tracking-wider">Generating ID...</code>
+                            <button onclick="copyRoomID()" class="bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-xs text-white font-bold px-3 py-2 rounded-lg transition-all">Copy</button>
+                        </div>
+                    </div>
+
+                    <!-- Connection Action Panel -->
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <!-- Join Panel -->
+                        <div class="bg-slate-950/40 border border-slate-800 p-4 rounded-xl space-y-3 text-left">
+                            <p class="text-xs font-semibold text-slate-400 tracking-wider uppercase">Join Friend's Room</p>
+                            <div class="space-y-2">
+                                <input type="text" id="join-id" placeholder="Paste ID here..." class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all">
+                                <button onclick="joinRoom()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold py-2 rounded-lg transition-all active:scale-95">Connect & Play</button>
+                            </div>
+                        </div>
+
+                        <!-- Add Friend Form -->
+                        <div class="bg-slate-950/40 border border-slate-800 p-4 rounded-xl space-y-3 text-left">
+                            <p class="text-xs font-semibold text-slate-400 tracking-wider uppercase">Save a New Friend</p>
+                            <div class="space-y-2">
+                                <input type="text" id="friend-name" placeholder="Friend's Name" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                                <input type="text" id="friend-id" placeholder="Friend's Room ID" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                                <button onclick="saveFriend()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-2 rounded-lg transition-all active:scale-95">Save Friend</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Friends List Component -->
+                    <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-left">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-xs font-semibold text-slate-400 tracking-wider uppercase">Your Saved Friends</span>
+                            <span class="text-[10px] text-slate-500">Saved on this browser</span>
+                        </div>
+                        <div id="friends-list-container" class="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                            <!-- Populated dynamically by javascript -->
+                            <p class="text-xs text-slate-500 italic text-center py-4">No saved friends yet. Add one above!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 3: Connect 4 Play Arena -->
+            <div id="view-c4" class="hidden flex-grow flex flex-col items-center justify-center">
+                <div class="flex items-center justify-between w-full max-w-md mb-6">
+                    <button onclick="quitToLobby()" class="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1">&larr; Main Menu</button>
+                    <div id="c4-turn-status" class="text-sm font-extrabold px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700">Waiting...</div>
+                    <button onclick="resetGame('c4')" class="text-xs font-bold text-indigo-400 hover:text-indigo-300">Restart</button>
+                </div>
+                
+                <!-- Connect 4 Columns Inputs -->
+                <div class="grid grid-cols-7 gap-2 sm:gap-3 w-full max-w-[450px] px-2 mb-2">
+                    <button onclick="dropC4(0)" class="h-8 rounded-lg bg-slate-800 hover:bg-blue-600/30 text-xs font-bold transition-all">&darr;</button>
+                    <button onclick="dropC4(1)" class="h-8 rounded-lg bg-slate-800 hover:bg-blue-600/30 text-xs font-bold transition-all">&darr;</button>
+                    <button onclick="dropC4(2)" class="h-8 rounded-lg bg-slate-800 hover:bg-blue-600/30 text-xs font-bold transition-all">&darr;</button>
+                    <button onclick="dropC4(3)" class="h-8 rounded-lg bg-slate-800 hover:bg-blue-600/30 text-xs font-bold transition-all">&darr;</button>
+                    <button onclick="dropC4(4)" class="h-8 rounded-lg bg-slate-800 hover:bg-blue-600/30 text-xs font-bold transition-all">&darr;</button>
+                    <button onclick="dropC4(5)" class="h-8 rounded-lg bg-slate-800 hover:bg-blue-600/30 text-xs font-bold transition-all">&darr;</button>
+                    <button onclick="dropC4(6)" class="h-8 rounded-lg bg-slate-800 hover:bg-blue-600/30 text-xs font-bold transition-all">&darr;</button>
+                </div>
+
+                <!-- Connect 4 Grid -->
+                <div class="bg-blue-600 p-3 sm:p-4 rounded-2xl shadow-2xl shadow-blue-500/10 border-4 border-blue-700 w-full max-w-[450px]">
+                    <div id="c4-grid" class="grid grid-cols-7 gap-2 sm:gap-3">
+                        <!-- Built dynamically by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 4: Tic-Tac-Toe Play Arena -->
+            <div id="view-ttt" class="hidden flex-grow flex flex-col items-center justify-center">
+                <div class="flex items-center justify-between w-full max-w-sm mb-6">
+                    <button onclick="quitToLobby()" class="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1">&larr; Main Menu</button>
+                    <div id="ttt-turn-status" class="text-sm font-extrabold px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700">Waiting...</div>
+                    <button onclick="resetGame('ttt')" class="text-xs font-bold text-indigo-400 hover:text-indigo-300">Restart</button>
+                </div>
+
+                <!-- Tic-Tac-Toe Grid -->
+                <div class="grid grid-cols-3 gap-3 w-full max-w-[320px] bg-slate-950 p-3 rounded-2xl border border-slate-800 shadow-2xl">
+                    <button onclick="playTTT(0)" id="ttt-0" class="h-24 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(1)" id="ttt-1" class="h-24 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(2)" id="ttt-2" class="h-24 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(3)" id="ttt-3" class="h-24 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(4)" id="ttt-4" class="h-24 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(5)" id="ttt-5" class="h-24 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(6)" id="ttt-6" class="h-24 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(7)" id="ttt-7" class="h-24 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                    <button onclick="playTTT(8)" id="ttt-8" class="h-24 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none"></button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Sidebar Live Chat & Activity -->
+        <div class="w-full lg:w-[380px] shrink-0 flex flex-col bg-slate-900/60 rounded-3xl border border-slate-800 overflow-hidden shadow-xl">
+            <!-- Sidebar Header -->
+            <div class="px-5 py-4 border-b border-slate-800 bg-slate-950/40 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-sm font-bold tracking-wide">Live Lobby Chat</span>
+                </div>
+                <span id="opponent-badge" class="text-xs bg-slate-800 text-slate-400 px-2 py-1 rounded-md font-semibold">Singleplayer</span>
+            </div>
+
+            <!-- Messages Window -->
+            <div id="chat-messages" class="flex-grow p-4 space-y-3 h-[300px] lg:h-[450px] overflow-y-auto custom-scrollbar bg-slate-950/20">
+                <div class="text-xs text-slate-500 text-center py-2 italic border-b border-slate-800/40">Welcome to the Lobby! Connect with a friend using their Room ID.</div>
+            </div>
+
+            <!-- Messages Input -->
+            <div class="p-3 border-t border-slate-800 bg-slate-950/50 flex gap-2">
+                <input type="text" id="chat-input" placeholder="Type a message..." class="flex-grow bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 transition-all" onkeypress="if(event.key === 'Enter') sendChat()">
+                <button onclick="sendChat()" class="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-4 py-2 text-sm font-bold transition-all shadow-md shadow-indigo-600/10 active:scale-95">Send</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // Game and network state management
+        let myUsername = "Player";
+        let opponentUsername = "Opponent";
+        let targetGameMode = null; // Stored when user clicks PLAY on landing
+        let activeGame = null; // 'c4' or 'ttt'
+        let peer = null;
+        let conn = null;
+        let myPlayerNum = 0; // 1 = Host, 2 = Guest
+        let currentPlayerTurn = 1; 
+        let isConnected = false;
+
+        // Connect 4 Data
+        const C4_ROWS = 6;
+        const C4_COLS = 7;
+        let c4Board = [];
+        let c4Active = false;
+
+        // Tic Tac Toe Data
+        let tttBoard = Array(9).fill("");
+        let tttActive = false;
+
+        // Friends List Array
+        let friends = [];
+
+        // UI View Swapper
+        function switchView(viewId) {
+            document.getElementById('view-landing').classList.add('hidden');
+            document.getElementById('view-lobby').classList.add('hidden');
+            document.getElementById('view-c4').classList.add('hidden');
+            document.getElementById('view-ttt').classList.add('hidden');
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        // Action when user clicks main landing "PLAY" buttons
+        function clickPlayGame(gameKey) {
+            targetGameMode = gameKey;
+            
+            // Set mode label on Connection Panel
+            const badge = document.getElementById('selected-game-badge');
+            if (gameKey === 'c4') {
+                badge.innerText = "Connect 4 Mode";
+                badge.className = "px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-xs font-semibold text-blue-400 uppercase tracking-wider";
+            } else {
+                badge.innerText = "Tic-Tac-Toe Mode";
+                badge.className = "px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400 uppercase tracking-wider";
+            }
+
+            switchView('view-lobby');
+        }
+
+        function backToLanding() {
+            targetGameMode = null;
+            switchView('view-landing');
+        }
+
+        function updateUsername() {
+            const input = document.getElementById('username');
+            myUsername = input.value.trim() || "Player";
+            if(conn && conn.open) {
+                conn.send({ type: 'sync_name', username: myUsername });
+            }
+        }
+
+        // --- P2P Connections ---
+        function initPeer() {
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                document.getElementById('my-id').innerText = id;
+            });
+
+            // When a friend joins our generated room ID
+            peer.on('connection', (connection) => {
+                conn = connection;
+                myPlayerNum = 1; // Host is Player 1
+                handleConnection();
+            });
+
+            // Load saved friends list
+            loadFriends();
+        }
+
+        function joinRoom(directId = null) {
+            const targetId = directId || document.getElementById('join-id').value.trim();
+            if(!targetId) {
+                alert("Please enter a friend's room ID first!");
+                return;
+            }
+            addSystemMsg("Connecting to room...");
+            conn = peer.connect(targetId);
+            myPlayerNum = 2; // Guest is Player 2
+            handleConnection();
+        }
+
+        function handleConnection() {
+            conn.on('open', () => {
+                isConnected = true;
+                document.getElementById('opponent-badge').innerText = "Connected";
+                document.getElementById('opponent-badge').classList.remove('bg-slate-800', 'text-slate-400');
+                document.getElementById('opponent-badge').classList.add('bg-emerald-500/10', 'text-emerald-400');
+                
+                // Instantly share names
+                conn.send({ type: 'sync_name', username: myUsername });
+                
+                addSystemMsg("Connection established! Ready to play.");
+
+                // If host, launch the game that was chosen on the landing page
+                if (myPlayerNum === 1 && targetGameMode) {
+                    selectGame(targetGameMode);
+                }
+            });
+
+            conn.on('data', (data) => {
+                if(data.type === 'sync_name') {
+                    opponentUsername = data.username;
+                    addSystemMsg(`${opponentUsername} joined the lobby!`);
+                } 
+                else if(data.type === 'chat') {
+                    addChatMessage(opponentUsername, data.message, false);
+                } 
+                else if(data.type === 'game_select') {
+                    activeGame = data.game;
+                    initGameEngine(activeGame, false);
+                }
+                else if(data.type === 'c4_move') {
+                    processC4Move(data.col, false);
+                }
+                else if(data.type === 'ttt_move') {
+                    processTTTMove(data.index, false);
+                }
+                else if(data.type === 'restart_game') {
+                    initGameEngine(data.game, false);
+                    addSystemMsg(`${opponentUsername} restarted the board.`);
+                }
+                else if(data.type === 'quit_game') {
+                    quitToLobbyLocal();
+                    addSystemMsg(`${opponentUsername} left the game and returned to lobby.`);
+                }
+            });
+
+            conn.on('close', () => {
+                resetConnectionState();
+            });
+            conn.on('error', () => {
+                resetConnectionState();
+            });
+        }
+
+        function resetConnectionState() {
+            isConnected = false;
+            myPlayerNum = 0;
+            addSystemMsg("Opponent disconnected.");
+            document.getElementById('opponent-badge').innerText = "Singleplayer";
+            document.getElementById('opponent-badge').classList.add('bg-slate-800', 'text-slate-400');
+            document.getElementById('opponent-badge').classList.remove('bg-emerald-500/10', 'text-emerald-400');
+            switchView('view-landing');
+        }
+
+        function copyRoomID() {
+            const myIdText = document.getElementById('my-id').innerText;
+            if (myIdText && myIdText !== "Generating ID...") {
+                const tempInput = document.createElement("input");
+                tempInput.value = myIdText;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand("copy");
+                document.body.removeChild(tempInput);
+                addSystemMsg("Room ID copied to clipboard!");
+            }
+        }
+
+        // --- Friends List Logic (Local Storage persistent) ---
+        function saveFriend() {
+            const nameInput = document.getElementById('friend-name');
+            const idInput = document.getElementById('friend-id');
+            const name = nameInput.value.trim();
+            const id = idInput.value.trim();
+
+            if (!name || !id) {
+                alert("Please fill in both name and ID fields!");
+                return;
+            }
+
+            // Check if ID already exists
+            if (friends.some(f => f.id === id)) {
+                alert("This friend is already saved!");
+                return;
+            }
+
+            friends.push({ name: name, id: id });
+            localStorage.setItem('p2p_arcade_friends', JSON.stringify(friends));
+            
+            nameInput.value = '';
+            idInput.value = '';
+            renderFriends();
+            addSystemMsg(`Saved friend ${name} to list!`);
+        }
+
+        function deleteFriend(idToDelete) {
+            friends = friends.filter(f => f.id !== idToDelete);
+            localStorage.setItem('p2p_arcade_friends', JSON.stringify(friends));
+            renderFriends();
+        }
+
+        function loadFriends() {
+            const raw = localStorage.getItem('p2p_arcade_friends');
+            if (raw) {
+                try {
+                    friends = JSON.parse(raw);
+                } catch(e) {
+                    friends = [];
+                }
+            }
+            renderFriends();
+        }
+
+        function renderFriends() {
+            const container = document.getElementById('friends-list-container');
+            container.innerHTML = '';
+
+            if (friends.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-500 italic text-center py-4">No saved friends yet. Add one above!</p>`;
+                return;
+            }
+
+            friends.forEach(f => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between bg-slate-900 border border-slate-800 px-3 py-2 rounded-xl text-xs gap-2";
+                div.innerHTML = `
+                    <div class="flex-grow min-w-0">
+                        <p class="font-bold text-slate-200 truncate">${f.name}</p>
+                        <p class="text-[10px] text-slate-500 truncate select-all">${f.id}</p>
+                    </div>
+                    <div class="flex gap-1">
+                        <button onclick="joinRoom('${f.id}')" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-2.5 py-1 rounded-md transition-all active:scale-95 text-[11px]">Connect</button>
+                        <button onclick="deleteFriend('${f.id}')" class="text-slate-500 hover:text-red-400 font-bold p-1 text-[11px]">&times;</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- Game Setup / Sync Dispatch ---
+        function selectGame(gameKey) {
+            if(!isConnected) return;
+            activeGame = gameKey;
+            conn.send({ type: 'game_select', game: gameKey });
+            initGameEngine(gameKey, true);
+        }
+
+        function initGameEngine(gameKey, isInitiator) {
+            currentPlayerTurn = 1; // Host always goes first
+            if (gameKey === 'c4') {
+                setupC4Board();
+                switchView('view-c4');
+            } else if (gameKey === 'ttt') {
+                setupTTTBoard();
+                switchView('view-ttt');
+            }
+        }
+
+        function quitToLobby() {
+            if(conn && conn.open) {
+                conn.send({ type: 'quit_game' });
+            }
+            quitToLobbyLocal();
+        }
+
+        function quitToLobbyLocal() {
+            activeGame = null;
+            switchView('view-landing');
+        }
+
+        function resetGame(gameKey) {
+            if(conn && conn.open) {
+                conn.send({ type: 'restart_game', game: gameKey });
+            }
+            initGameEngine(gameKey, true);
+        }
+
+        // --- Connect 4 Engine ---
+        function setupC4Board() {
+            c4Active = true;
+            c4Board = [];
+            const gridContainer = document.getElementById('c4-grid');
+            gridContainer.innerHTML = '';
+
+            for (let r = 0; r < C4_ROWS; r++) {
+                c4Board[r] = [];
+                for (let c = 0; c < C4_COLS; c++) {
+                    c4Board[r][c] = 0;
+                    const cell = document.createElement('div');
+                    cell.id = `c4-${r}-${c}`;
+                    cell.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-950 c4-cell transition-all duration-300";
+                    gridContainer.appendChild(cell);
+                }
+            }
+            updateC4TurnDisplay();
+        }
+
+        function updateC4TurnDisplay() {
+            const status = document.getElementById('c4-turn-status');
+            if(!c4Active) return;
+            if(currentPlayerTurn === myPlayerNum) {
+                status.innerText = "Your Turn";
+                status.className = "text-sm font-extrabold px-3 py-1.5 rounded-full " + (myPlayerNum === 1 ? "bg-red-500/20 text-red-400 border border-red-500/30" : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30");
+            } else {
+                status.innerText = `${opponentUsername}'s Turn`;
+                status.className = "text-sm font-extrabold px-3 py-1.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700";
+            }
+        }
+
+        // Trigger chip dropping
+        function dropC4(col) {
+            if (!c4Active || currentPlayerTurn !== myPlayerNum) return;
+            processC4Move(col, true);
+        }
+
+        function processC4Move(col, isLocal) {
+            let row = -1;
+            for (let r = C4_ROWS - 1; r >= 0; r--) {
+                if (c4Board[r][col] === 0) {
+                    row = r;
+                    break;
+                }
+            }
+            if (row === -1) return; // Column full
+
+            c4Board[row][col] = currentPlayerTurn;
+            const cell = document.getElementById(`c4-${row}-${col}`);
+            if (currentPlayerTurn === 1) {
+                cell.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-red-500 neon-shadow-red transition-all duration-300";
+            } else {
+                cell.className = "w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-yellow-500 neon-shadow-yellow transition-all duration-300";
+            }
+
+            if (isLocal) {
+                conn.send({ type: 'c4_move', col: col });
+            }
+
+            if (checkC4Win(row, col)) {
+                c4Active = false;
+                const status = document.getElementById('c4-turn-status');
+                if (currentPlayerTurn === myPlayerNum) {
+                    status.innerText = "🎉 You Won! 🎉";
+                    status.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                } else {
+                    status.innerText = `🏆 ${opponentUsername} Wins!`;
+                    status.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-red-500/20 text-red-400 border border-red-500/30";
+                }
+                return;
+            }
+
+            currentPlayerTurn = currentPlayerTurn === 1 ? 2 : 1;
+            updateC4TurnDisplay();
+        }
+
+        function checkC4Win(r, c) {
+            const player = c4Board[r][c];
+            const directions = [[0,1], [1,0], [1,1], [1,-1]];
+            for (let [dr, dc] of directions) {
+                let count = 1;
+                // Forward
+                for(let i=1; i<4; i++) {
+                    let nr = r + dr*i, nc = c + dc*i;
+                    if(nr>=0 && nr<C4_ROWS && nc>=0 && nc<C4_COLS && c4Board[nr][nc] === player) count++;
+                    else break;
+                }
+                // Backward
+                for(let i=1; i<4; i++) {
+                    let nr = r - dr*i, nc = c - dc*i;
+                    if(nr>=0 && nr<C4_ROWS && nc>=0 && nc<C4_COLS && c4Board[nr][nc] === player) count++;
+                    else break;
+                }
+                if(count >= 4) return true;
+            }
+            return false;
+        }
+
+        // --- Tic-Tac-Toe Engine ---
+        function setupTTTBoard() {
+            tttActive = true;
+            tttBoard = Array(9).fill("");
+            for(let i=0; i<9; i++) {
+                const btn = document.getElementById(`ttt-${i}`);
+                btn.innerText = "";
+                btn.className = "h-24 w-full bg-slate-900 border border-slate-800 hover:bg-slate-850 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none";
+            }
+            updateTTTTurnDisplay();
+        }
+
+        function updateTTTTurnDisplay() {
+            const status = document.getElementById('ttt-turn-status');
+            if(!tttActive) return;
+            if(currentPlayerTurn === myPlayerNum) {
+                status.innerText = "Your Turn (X)";
+                status.className = "text-sm font-extrabold px-3 py-1.5 rounded-full " + (myPlayerNum === 1 ? "bg-red-500/20 text-red-400 border border-red-500/30" : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30");
+            } else {
+                status.innerText = `${opponentUsername}'s Turn (O)`;
+                status.className = "text-sm font-extrabold px-3 py-1.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700";
+            }
+        }
+
+        function playTTT(index) {
+            if (!tttActive || currentPlayerTurn !== myPlayerNum || tttBoard[index] !== "") return;
+            processTTTMove(index, true);
+        }
+
+        function processTTTMove(index, isLocal) {
+            const marker = currentPlayerTurn === 1 ? "X" : "O";
+            tttBoard[index] = marker;
+            
+            const btn = document.getElementById(`ttt-${index}`);
+            btn.innerText = marker;
+            btn.className = `h-24 w-full bg-slate-900 border border-slate-800 rounded-xl text-3xl font-extrabold flex items-center justify-center transition-all focus:outline-none ${currentPlayerTurn === 1 ? 'text-red-500 neon-shadow-red' : 'text-yellow-500 neon-shadow-yellow'}`;
+
+            if(isLocal) {
+                conn.send({ type: 'ttt_move', index: index });
+            }
+
+            if(checkTTTWin()) {
+                tttActive = false;
+                const status = document.getElementById('ttt-turn-status');
+                if (currentPlayerTurn === myPlayerNum) {
+                    status.innerText = "🎉 You Won! 🎉";
+                    status.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                } else {
+                    status.innerText = `🏆 ${opponentUsername} Wins!`;
+                    status.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-red-500/20 text-red-400 border border-red-500/30";
+                }
+                return;
+            }
+
+            if(!tttBoard.includes("")) {
+                tttActive = false;
+                const status = document.getElementById('ttt-turn-status');
+                status.innerText = "🤝 Tie Game! 🤝";
+                status.className = "text-sm font-extrabold px-4 py-2 rounded-full bg-slate-800 text-slate-300 border border-slate-700";
+                return;
+            }
+
+            currentPlayerTurn = currentPlayerTurn === 1 ? 2 : 1;
+            updateTTTTurnDisplay();
+        }
+
+        function checkTTTWin() {
+            const wins = [
+                [0,1,2], [3,4,5], [6,7,8], // rows
+                [0,3,6], [1,4,7], [2,5,8], // cols
+                [0,4,8], [2,4,6]           // diagonals
+            ];
+            return wins.some(comb => {
+                return tttBoard[comb[0]] !== "" && 
+                       tttBoard[comb[0]] === tttBoard[comb[1]] && 
+                       tttBoard[comb[0]] === tttBoard[comb[2]];
+            });
+        }
+
+        // --- Chat Window ---
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if(!message) return;
+
+            addChatMessage("You", message, true);
+            if(conn && conn.open) {
+                conn.send({ type: 'chat', message: message });
+            }
+            input.value = '';
+        }
+
+        function addChatMessage(user, msg, isMe) {
+            const box = document.getElementById('chat-messages');
+            const el = document.createElement('div');
+            el.className = "flex flex-col text-sm " + (isMe ? "items-end" : "items-start");
+            
+            const nameColor = isMe ? "text-indigo-400" : "text-emerald-400 font-semibold";
+            const bubbleBg = isMe ? "bg-indigo-600/10 border border-indigo-500/20 text-indigo-100" : "bg-slate-800 text-slate-200 border border-slate-750";
+            
+            el.innerHTML = `
+                <span class="text-xs text-slate-500 mb-0.5">${user}</span>
+                <div class="px-3.5 py-2 rounded-2xl max-w-[85%] ${bubbleBg} break-words leading-relaxed">${msg}</div>
+            `;
+            box.appendChild(el);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function addSystemMsg(text) {
+            const box = document.getElementById('chat-messages');
+            const el = document.createElement('div');
+            el.className = "text-center text-xs text-slate-500 bg-slate-900/50 py-1.5 px-3 rounded-lg border border-slate-850/60 my-2";
+            el.innerText = text;
+            box.appendChild(el);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        // Run setup on load
+        window.onload = initPeer;
+    </script>
+</body>
+</html>
